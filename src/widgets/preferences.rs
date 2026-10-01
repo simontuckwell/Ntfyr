@@ -161,7 +161,11 @@ impl NtfyrPreferences {
             }
         });
         settings
-            .bind("sort-descending", &*obj.imp().sort_descending_switch, "active")
+            .bind(
+                "sort-descending",
+                &*obj.imp().sort_descending_switch,
+                "active",
+            )
             .build();
 
         // Datetime format combo
@@ -190,13 +194,21 @@ impl NtfyrPreferences {
             });
 
         settings
-            .bind("start-in-background", &*obj.imp().startup_background_switch, "active")
+            .bind(
+                "start-in-background",
+                &*obj.imp().startup_background_switch,
+                "active",
+            )
             .build();
         settings
             .bind("app-lock-enabled", &*obj.imp().app_lock_switch, "active")
             .build();
         settings
-            .bind("show-default-server", &*obj.imp().show_default_server_switch, "active")
+            .bind(
+                "show-default-server",
+                &*obj.imp().show_default_server_switch,
+                "active",
+            )
             .flags(gio::SettingsBindFlags::GET)
             .build();
 
@@ -270,9 +282,9 @@ impl NtfyrPreferences {
         settings
             .bind("auto-lock-enabled", &*obj.imp().auto_lock_switch, "active")
             .build();
-        
-        // Timeout is in seconds in GSchema, but UI shows minutes. 
-        // We'll need a custom mapping or just simple property binding if we change GSchema to minutes? 
+
+        // Timeout is in seconds in GSchema, but UI shows minutes.
+        // We'll need a custom mapping or just simple property binding if we change GSchema to minutes?
         // No, GSchema is usually int. Let's assume we bind it directly for now, but lock-timeout is seconds.
         // Wait, SpinRow shows a value. If GSchema is seconds (e.g. 300), SpinRow 1-60 will be wrong.
         // I should probably change the GSchema to be minutes for simplicity, or use a map_get/set.
@@ -282,7 +294,7 @@ impl NtfyrPreferences {
         // Actually, for this iteration, let's just make the GSchema 'lock-timeout-minutes' or similar?
         // No, 'lock-timeout' in seconds is better for granularity if needed later.
         // I will use `bind_with_mapping`.
-        
+
         // Manual binding for lock-timeout to handle seconds <-> minutes conversion
         let row = obj.imp().auto_lock_timeout.clone();
         let settings_clone = settings.clone();
@@ -312,170 +324,175 @@ impl NtfyrPreferences {
         });
 
         obj.imp().change_password_row.connect_activated(move |row| {
-             let parent_window = row.root().and_then(|w| w.downcast::<gtk::Window>().ok());
- 
-             glib::MainContext::default().spawn_local(async move {
-                 let has_pass = crate::secrets::has_password().await.unwrap_or(false);
-                 
-                 let heading = if has_pass {
-                     gettext("Change Password")
-                 } else {
-                     gettext("Set App Lock Password")
-                 };
-                 let body = if has_pass {
-                     gettext("Enter your current password and a new password.")
-                 } else {
-                     gettext("Enter a new password to secure the application.")
-                 };
-                 // Note: "Save" is now a custom button to prevent auto-closing
-                 
-                 let content_box = gtk::Box::builder()
-                     .orientation(gtk::Orientation::Vertical)
-                     .spacing(12)
-                     .build();
+            let parent_window = row.root().and_then(|w| w.downcast::<gtk::Window>().ok());
 
-                 let list = adw::PreferencesGroup::new();
-                 content_box.append(&list);
-                 
-                 let current_entry = if has_pass {
-                     let e = adw::PasswordEntryRow::builder()
-                         .title(gettext("Current Password"))
-                         .activates_default(true)
-                         .build();
-                     list.add(&e);
-                     Some(e)
-                 } else {
-                     None
-                 };
- 
-                 let new_entry = adw::PasswordEntryRow::builder()
-                     .title(gettext("New Password"))
-                     .activates_default(true)
-                     .build();
-                 list.add(&new_entry);
- 
-                 let confirm_entry = adw::PasswordEntryRow::builder()
-                     .title(gettext("Confirm Password"))
-                     .activates_default(true)
-                     .build();
-                 list.add(&confirm_entry);
+            glib::MainContext::default().spawn_local(async move {
+                let has_pass = crate::secrets::has_password().await.unwrap_or(false);
 
-                 let error_label = gtk::Label::builder()
-                     .css_classes(["error", "caption"])
-                     .halign(gtk::Align::Center)
-                     .visible(false)
-                     .margin_bottom(12)
-                     .build();
-                 content_box.append(&error_label);
+                let heading = if has_pass {
+                    gettext("Change Password")
+                } else {
+                    gettext("Set App Lock Password")
+                };
+                let body = if has_pass {
+                    gettext("Enter your current password and a new password.")
+                } else {
+                    gettext("Enter a new password to secure the application.")
+                };
+                // Note: "Save" is now a custom button to prevent auto-closing
 
-                 let save_button = gtk::Button::builder()
-                     .label(gettext("Save"))
-                     .css_classes(["suggested-action", "pill"])
-                     .margin_top(12)
-                     .margin_bottom(12)
-                     .halign(gtk::Align::Center)
-                     .width_request(120)
-                     .build();
-                 content_box.append(&save_button);
+                let content_box = gtk::Box::builder()
+                    .orientation(gtk::Orientation::Vertical)
+                    .spacing(12)
+                    .build();
 
-                 let dialog = adw::AlertDialog::builder()
-                     .heading(heading)
-                     .body(body)
-                     .extra_child(&content_box)
-                     .close_response("cancel")
-                     .build();
-                 dialog.add_response("cancel", &gettext("Cancel"));
+                let list = adw::PreferencesGroup::new();
+                content_box.append(&list);
 
-                 let d = dialog.clone();
-                 // Clone widgets for the closure
-                 let current_entry_c = current_entry.clone();
-                 let new_entry_c = new_entry.clone();
-                 let confirm_entry_c = confirm_entry.clone();
-                 let error_label_c = error_label.clone();
-                 
-                 save_button.connect_clicked(move |_| {
-                     let d = d.clone();
-                     let current_entry = current_entry_c.clone();
-                     let new_entry = new_entry_c.clone();
-                     let confirm_entry = confirm_entry_c.clone();
-                     let error_label = error_label_c.clone();
-                     
-                     glib::MainContext::default().spawn_local(async move {
-                         let new_pass = new_entry.text().to_string();
-                         let confirm_pass = confirm_entry.text().to_string();
+                let current_entry = if has_pass {
+                    let e = adw::PasswordEntryRow::builder()
+                        .title(gettext("Current Password"))
+                        .activates_default(true)
+                        .build();
+                    list.add(&e);
+                    Some(e)
+                } else {
+                    None
+                };
 
-                         // Visual Reset
-                         new_entry.remove_css_class("error");
-                         confirm_entry.remove_css_class("error");
-                         if let Some(c) = &current_entry {
-                             c.remove_css_class("error");
-                         }
-                         error_label.set_visible(false);
+                let new_entry = adw::PasswordEntryRow::builder()
+                    .title(gettext("New Password"))
+                    .activates_default(true)
+                    .build();
+                list.add(&new_entry);
 
-                         // Validate confirmation
-                         if new_pass != confirm_pass {
-                             error_label.set_text(&gettext("Passwords do not match"));
-                             error_label.set_visible(true);
-                             new_entry.add_css_class("error");
-                             confirm_entry.add_css_class("error");
-                             return;
-                         }
+                let confirm_entry = adw::PasswordEntryRow::builder()
+                    .title(gettext("Confirm Password"))
+                    .activates_default(true)
+                    .build();
+                list.add(&confirm_entry);
 
-                         if new_pass.is_empty() {
-                             error_label.set_text(&gettext("Empty password not allowed"));
-                             error_label.set_visible(true);
-                             new_entry.add_css_class("error");
-                             return;
-                         }
+                let error_label = gtk::Label::builder()
+                    .css_classes(["error", "caption"])
+                    .halign(gtk::Align::Center)
+                    .visible(false)
+                    .margin_bottom(12)
+                    .build();
+                content_box.append(&error_label);
 
-                         if let Some(curr) = current_entry {
-                             let curr_pass = curr.text();
-                             let stored = crate::secrets::get_password().await.unwrap_or(None);
-                             if let Some(stored_pass) = stored {
-                                 use subtle::ConstantTimeEq;
-                                 let matches = bool::from(
-                                     curr_pass.as_bytes().ct_eq(stored_pass.as_bytes()),
-                                 );
-                                 if !matches {
-                                     error_label.set_text(&gettext("Current password incorrect"));
-                                     error_label.set_visible(true);
-                                     curr.add_css_class("error");
-                                     curr.grab_focus();
-                                     return;
-                                 }
-                             }
-                         }
+                let save_button = gtk::Button::builder()
+                    .label(gettext("Save"))
+                    .css_classes(["suggested-action", "pill"])
+                    .margin_top(12)
+                    .margin_bottom(12)
+                    .halign(gtk::Align::Center)
+                    .width_request(120)
+                    .build();
+                content_box.append(&save_button);
 
-                         // Valid
-                         if let Err(e) = crate::secrets::store_password(&new_pass).await {
-                             tracing::error!("Failed to store password: {}", e);
-                             error_label.set_text(
-                                 &gettext("Error: {}").replacen("{}", &e.to_string(), 1),
-                             );
-                             error_label.set_visible(true);
-                         } else {
-                             tracing::info!("Password set successfully");
-                             d.close();
-                         }
-                     });
-                 });
+                let dialog = adw::AlertDialog::builder()
+                    .heading(heading)
+                    .body(body)
+                    .extra_child(&content_box)
+                    .close_response("cancel")
+                    .build();
+                dialog.add_response("cancel", &gettext("Cancel"));
 
-                 // Helper to trigger save on enter
-                 if let Some(e) = &current_entry {
-                     let b = save_button.clone();
-                     e.connect_apply(move |_| { b.activate(); });
-                 }
-                 let b = save_button.clone();
-                 new_entry.connect_apply(move |_| { b.activate(); });
-                 let b = save_button.clone();
-                 confirm_entry.connect_apply(move |_| { b.activate(); });
+                let d = dialog.clone();
+                // Clone widgets for the closure
+                let current_entry_c = current_entry.clone();
+                let new_entry_c = new_entry.clone();
+                let confirm_entry_c = confirm_entry.clone();
+                let error_label_c = error_label.clone();
 
-                 let _ = dialog.choose_future(parent_window.as_ref()).await;
-             });
+                save_button.connect_clicked(move |_| {
+                    let d = d.clone();
+                    let current_entry = current_entry_c.clone();
+                    let new_entry = new_entry_c.clone();
+                    let confirm_entry = confirm_entry_c.clone();
+                    let error_label = error_label_c.clone();
+
+                    glib::MainContext::default().spawn_local(async move {
+                        let new_pass = new_entry.text().to_string();
+                        let confirm_pass = confirm_entry.text().to_string();
+
+                        // Visual Reset
+                        new_entry.remove_css_class("error");
+                        confirm_entry.remove_css_class("error");
+                        if let Some(c) = &current_entry {
+                            c.remove_css_class("error");
+                        }
+                        error_label.set_visible(false);
+
+                        // Validate confirmation
+                        if new_pass != confirm_pass {
+                            error_label.set_text(&gettext("Passwords do not match"));
+                            error_label.set_visible(true);
+                            new_entry.add_css_class("error");
+                            confirm_entry.add_css_class("error");
+                            return;
+                        }
+
+                        if new_pass.is_empty() {
+                            error_label.set_text(&gettext("Empty password not allowed"));
+                            error_label.set_visible(true);
+                            new_entry.add_css_class("error");
+                            return;
+                        }
+
+                        if let Some(curr) = current_entry {
+                            let curr_pass = curr.text();
+                            let stored = crate::secrets::get_password().await.unwrap_or(None);
+                            if let Some(stored_pass) = stored {
+                                use subtle::ConstantTimeEq;
+                                let matches =
+                                    bool::from(curr_pass.as_bytes().ct_eq(stored_pass.as_bytes()));
+                                if !matches {
+                                    error_label.set_text(&gettext("Current password incorrect"));
+                                    error_label.set_visible(true);
+                                    curr.add_css_class("error");
+                                    curr.grab_focus();
+                                    return;
+                                }
+                            }
+                        }
+
+                        // Valid
+                        if let Err(e) = crate::secrets::store_password(&new_pass).await {
+                            tracing::error!("Failed to store password: {}", e);
+                            error_label.set_text(&gettext("Error: {}").replacen(
+                                "{}",
+                                &e.to_string(),
+                                1,
+                            ));
+                            error_label.set_visible(true);
+                        } else {
+                            tracing::info!("Password set successfully");
+                            d.close();
+                        }
+                    });
+                });
+
+                // Helper to trigger save on enter
+                if let Some(e) = &current_entry {
+                    let b = save_button.clone();
+                    e.connect_apply(move |_| {
+                        b.activate();
+                    });
+                }
+                let b = save_button.clone();
+                new_entry.connect_apply(move |_| {
+                    b.activate();
+                });
+                let b = save_button.clone();
+                confirm_entry.connect_apply(move |_| {
+                    b.activate();
+                });
+
+                let _ = dialog.choose_future(parent_window.as_ref()).await;
+            });
         });
 
         obj
     }
-
-
 }

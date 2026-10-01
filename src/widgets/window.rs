@@ -6,17 +6,17 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 
 use gtk::{gio, glib};
-use ntfy_daemon::models;
 use ntfy_daemon::NtfyHandle;
+use ntfy_daemon::models;
 use tracing::{error, info, warn};
 
 use crate::application::NtfyrApplication;
 use crate::config::{APP_ID, PROFILE};
 use crate::error::*;
-use anyhow::Result;
 use crate::subscription::Status;
 use crate::subscription::Subscription;
 use crate::widgets::*;
+use anyhow::Result;
 
 mod imp {
     use super::*;
@@ -59,7 +59,7 @@ mod imp {
         pub send_btn: TemplateChild<gtk::Button>,
         #[template_child]
         pub code_btn: TemplateChild<gtk::Button>,
-        
+
         // Unified Inbox
         #[template_child]
         pub content_stack: TemplateChild<gtk::Stack>,
@@ -97,7 +97,7 @@ mod imp {
                 list_view: Default::default(),
                 message_scroll: Default::default(),
                 banner: Default::default(),
-               content_stack: Default::default(),
+                content_stack: Default::default(),
                 unified_inbox_view: Default::default(),
                 unified_message_list: Default::default(),
                 subscription_list_model: gio::ListStore::new::<Subscription>(),
@@ -125,7 +125,8 @@ mod imp {
             let this = self.obj().clone();
             let settings = gio::Settings::new(crate::config::APP_ID);
             let default_server = settings.string("default-server");
-            let server = this.selected_subscription()
+            let server = this
+                .selected_subscription()
                 .map(|x| x.server())
                 .unwrap_or(default_server.to_string());
             let dialog = AddSubscriptionDialog::new(server);
@@ -247,7 +248,7 @@ impl NtfyrWindow {
 
         // Load latest window state
         obj.load_window_size();
-        
+
         obj.bind_message_list();
         obj.connect_entry_and_send_btn();
         obj.connect_code_btn();
@@ -274,10 +275,13 @@ impl NtfyrWindow {
         entry.error_boundary().spawn(async move {
             this.selected_subscription()
                 .unwrap()
-                .publish_msg(models::OutgoingMessage {
-                    message: Some(entry.text().as_str().to_string()),
-                    ..models::OutgoingMessage::default()
-                }, false)
+                .publish_msg(
+                    models::OutgoingMessage {
+                        message: Some(entry.text().as_str().to_string()),
+                        ..models::OutgoingMessage::default()
+                    },
+                    false,
+                )
                 .await?;
             entry.set_text("");
             Ok(())
@@ -337,7 +341,7 @@ impl NtfyrWindow {
         });
         let this = self.clone();
         settings.connect_changed(Some("show-default-server"), move |_, _| {
-             this.rebuild_subscription_list();
+            this.rebuild_subscription_list();
         });
     }
 
@@ -352,18 +356,18 @@ impl NtfyrWindow {
             // We want to still check if there were any errors adding the subscription.
 
             this.attach_sort_trigger(&subscription);
-            
+
             imp.subscription_list_model.append(&subscription);
-            
+
             // Wait for info to load
             glib::timeout_future_seconds(1).await;
-            
+
             // Rebuild the UI list
             this.rebuild_subscription_list();
-            
-            // TODO: Select the newly added subscription? 
+
+            // TODO: Select the newly added subscription?
             // For now let's just ensure it appears.
-            
+
             Ok(())
         });
     }
@@ -375,9 +379,10 @@ impl NtfyrWindow {
 
         let this = self.clone();
         self.error_boundary().spawn(async move {
-            if let Err(e) = this.notifier()
+            if let Err(e) = this
+                .notifier()
                 .unsubscribe(sub.server().as_str(), sub.topic().as_str())
-                .await 
+                .await
             {
                 warn!("Failed to unsubscribe from backend: {}", e);
             }
@@ -385,10 +390,10 @@ impl NtfyrWindow {
             let imp = this.imp();
             if let Some(i) = imp.subscription_list_model.find(&sub) {
                 imp.subscription_list_model.remove(i);
-                
+
                 // Rebuild the UI list
                 this.rebuild_subscription_list();
-                
+
                 // Clear selection if needed
                 let n_items = imp.subscription_list_model.n_items();
                 if n_items == 0 {
@@ -401,7 +406,7 @@ impl NtfyrWindow {
 
     pub fn purge_default_server_topics(&self) {
         let this = self.clone();
-        
+
         self.error_boundary().spawn(async move {
             info!("Starting purge of default server topics");
             let imp = this.imp();
@@ -409,7 +414,11 @@ impl NtfyrWindow {
 
             // Collect subscriptions to remove from the UI model
             for i in 0..imp.subscription_list_model.n_items() {
-                if let Some(sub) = imp.subscription_list_model.item(i).and_downcast::<Subscription>() {
+                if let Some(sub) = imp
+                    .subscription_list_model
+                    .item(i)
+                    .and_downcast::<Subscription>()
+                {
                     if sub.server() == "https://ntfy.sh" {
                         info!("Found topic to remove: {}", sub.topic());
                         to_remove.push(sub);
@@ -421,7 +430,7 @@ impl NtfyrWindow {
 
             for sub in to_remove {
                 info!("Purging topic: {}", sub.topic());
-                
+
                 // Get the subscription handle to delete messages
                 if let Some(handle) = sub.imp().client.get() {
                     // Delete all messages for this topic
@@ -431,17 +440,18 @@ impl NtfyrWindow {
                         info!("Cleared notifications for {}", sub.topic());
                     }
                 }
-                
+
                 // Unsubscribe from the daemon (removes from DB and stops listener)
-                if let Err(e) = this.notifier()
+                if let Err(e) = this
+                    .notifier()
                     .unsubscribe(sub.server().as_str(), sub.topic().as_str())
-                    .await 
+                    .await
                 {
                     warn!("Failed to unsubscribe {}: {}", sub.topic(), e);
                 } else {
                     info!("Successfully unsubscribed from {}", sub.topic());
                 }
-                
+
                 // Remove from model if present
                 if let Some(i) = imp.subscription_list_model.find(&sub) {
                     info!("Removing {} from model at index {}", sub.topic(), i);
@@ -450,19 +460,19 @@ impl NtfyrWindow {
                     warn!("Could not find {} in model to remove", sub.topic());
                 }
             }
-            
+
             info!("Purge complete, rebuilding UI");
-            
+
             // Trigger UI rebuild
             this.rebuild_subscription_list();
-            
+
             // Clear selection if needed
             if imp.subscription_list_model.n_items() == 0 {
                 this.selected_subscription_changed(None);
             }
-            
+
             info!("Default server topics purged successfully");
-            
+
             Ok::<_, anyhow::Error>(())
         });
     }
@@ -473,11 +483,11 @@ impl NtfyrWindow {
     fn selected_subscription(&self) -> Option<Subscription> {
         let imp = self.imp();
         let row = imp.subscription_list.selected_row()?;
-        
+
         // Get topic and server from the row data
         let topic = unsafe { row.data::<String>("topic")?.as_ref().clone() };
         let server = unsafe { row.data::<String>("server")?.as_ref().clone() };
-        
+
         // Find the matching subscription in the model
         if let Some(sort_model) = imp.subscription_sort_model.get() {
             for i in 0..sort_model.n_items() {
@@ -497,7 +507,7 @@ impl NtfyrWindow {
             println!("UnifiedInbox: Mapping subscription {}", sub.topic());
             sub.imp().messages.clone().upcast::<glib::Object>()
         });
-        
+
         let flatten_model = gtk::FlattenListModel::new(Some(map_model));
 
         let settings = imp.settings.clone();
@@ -523,15 +533,19 @@ impl NtfyrWindow {
         let sort_model = gtk::SortListModel::new(Some(flatten_model), Some(sorter_upcast));
         let _ = imp.unified_sorter.set(sorter_clone);
         let _ = imp.unified_sort_model.set(sort_model.clone());
-        
+
         let this = self.clone();
-        imp.unified_message_list.bind_model(Some(&sort_model), move |obj| {
-             let b = obj.downcast_ref::<glib::BoxedAnyObject>().unwrap();
-             let msg = b.borrow::<models::ReceivedMessage>();
-             let id = msg.id.clone();
-             let this = this.clone();
-             MessageRow::new(msg.clone(), move || this.delete_message_anywhere(id.clone())).upcast()
-        });
+        imp.unified_message_list
+            .bind_model(Some(&sort_model), move |obj| {
+                let b = obj.downcast_ref::<glib::BoxedAnyObject>().unwrap();
+                let msg = b.borrow::<models::ReceivedMessage>();
+                let id = msg.id.clone();
+                let this = this.clone();
+                MessageRow::new(msg.clone(), move || {
+                    this.delete_message_anywhere(id.clone())
+                })
+                .upcast()
+            });
 
         // Unified inbox selection is handled in subscription_list row_activated
     }
@@ -541,13 +555,18 @@ impl NtfyrWindow {
     fn delete_message_anywhere(&self, id: String) {
         let model = &self.imp().subscription_list_model;
         for i in 0..model.n_items() {
-            let Some(sub) = model.item(i).and_downcast::<Subscription>() else { continue };
+            let Some(sub) = model.item(i).and_downcast::<Subscription>() else {
+                continue;
+            };
             let msgs = sub.imp().messages.clone();
             for j in 0..msgs.n_items() {
-                let Some(obj) = msgs.item(j).and_downcast::<glib::BoxedAnyObject>() else { continue };
+                let Some(obj) = msgs.item(j).and_downcast::<glib::BoxedAnyObject>() else {
+                    continue;
+                };
                 let owns = obj.borrow::<models::ReceivedMessage>().id == id;
                 if owns {
-                    self.error_boundary().spawn(async move { sub.delete_message(id).await });
+                    self.error_boundary()
+                        .spawn(async move { sub.delete_message(id).await });
                     return;
                 }
             }
@@ -556,7 +575,7 @@ impl NtfyrWindow {
 
     fn bind_message_list(&self) {
         let imp = self.imp();
-        
+
         self.bind_unified_inbox();
 
         let sorter = gtk::CustomSorter::new(|a, b| {
@@ -568,63 +587,66 @@ impl NtfyrWindow {
 
             let server_cmp = server_a.cmp(&server_b);
             if server_cmp != std::cmp::Ordering::Equal {
-                 return server_cmp.into();
+                return server_cmp.into();
             }
-            
+
             a.topic().cmp(&b.topic()).into()
         });
-        
+
         imp.subscription_sorter.set(sorter.clone()).unwrap();
 
-        let sort_model = gtk::SortListModel::new(Some(imp.subscription_list_model.clone()), Some(sorter));
+        let sort_model =
+            gtk::SortListModel::new(Some(imp.subscription_list_model.clone()), Some(sorter));
         let _ = imp.subscription_sort_model.set(sort_model.clone());
 
         // NO header function - we create a flat list with server ActionRows directly
-        
+
         let this = self.clone();
-        imp.subscription_list.connect_row_activated(move |_list, row| {
-            let imp = this.imp();
-            
-            // Check if unified inbox row
-            let is_inbox = unsafe { row.data::<bool>("unified-inbox").is_some() };
-            if is_inbox {
-                this.selected_subscription_changed(None);
-                imp.content_stack.set_visible_child(&*imp.unified_inbox_view);
-                imp.navigation_split_view.set_show_content(true);
-                return;
-            }
-            
-            // Check if server row or placeholder - ignore these
-            let is_server = unsafe { row.data::<bool>("server-row").is_some() };
-            let is_placeholder = unsafe { row.data::<bool>("placeholder").is_some() };
-            if is_server || is_placeholder {
-                return;
-            }
-            
-            // Topic row - find the subscription by topic+server
-            let topic = unsafe { row.data::<String>("topic").map(|s| s.as_ref().clone()) };
-            let server = unsafe { row.data::<String>("server").map(|s| s.as_ref().clone()) };
-            
-            if let (Some(topic), Some(server)) = (topic, server) {
-                // Find the subscription in the model
-                if let Some(sort_model) = imp.subscription_sort_model.get() {
-                    for i in 0..sort_model.n_items() {
-                        if let Some(sub) = sort_model.item(i).and_downcast::<Subscription>() {
-                            if sub.topic() == topic && sub.server() == server {
-                                this.selected_subscription_changed(Some(&sub));
-                                imp.content_stack.set_visible_child(&*imp.subscription_view);
-                                imp.navigation_split_view.set_show_content(true);
-                                return;
+        imp.subscription_list
+            .connect_row_activated(move |_list, row| {
+                let imp = this.imp();
+
+                // Check if unified inbox row
+                let is_inbox = unsafe { row.data::<bool>("unified-inbox").is_some() };
+                if is_inbox {
+                    this.selected_subscription_changed(None);
+                    imp.content_stack
+                        .set_visible_child(&*imp.unified_inbox_view);
+                    imp.navigation_split_view.set_show_content(true);
+                    return;
+                }
+
+                // Check if server row or placeholder - ignore these
+                let is_server = unsafe { row.data::<bool>("server-row").is_some() };
+                let is_placeholder = unsafe { row.data::<bool>("placeholder").is_some() };
+                if is_server || is_placeholder {
+                    return;
+                }
+
+                // Topic row - find the subscription by topic+server
+                let topic = unsafe { row.data::<String>("topic").map(|s| s.as_ref().clone()) };
+                let server = unsafe { row.data::<String>("server").map(|s| s.as_ref().clone()) };
+
+                if let (Some(topic), Some(server)) = (topic, server) {
+                    // Find the subscription in the model
+                    if let Some(sort_model) = imp.subscription_sort_model.get() {
+                        for i in 0..sort_model.n_items() {
+                            if let Some(sub) = sort_model.item(i).and_downcast::<Subscription>() {
+                                if sub.topic() == topic && sub.server() == server {
+                                    this.selected_subscription_changed(Some(&sub));
+                                    imp.content_stack.set_visible_child(&*imp.subscription_view);
+                                    imp.navigation_split_view.set_show_content(true);
+                                    return;
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
 
         // Initial population (empty servers only at first)
         self.rebuild_subscription_list();
-        
+
         // Load subscriptions asynchronously
         let this = self.clone();
         self.error_boundary().spawn(async move {
@@ -646,37 +668,41 @@ impl NtfyrWindow {
     fn rebuild_subscription_list(&self) {
         let imp = self.imp();
         let list = &imp.subscription_list;
-        
+
         // Clear existing rows
         while let Some(child) = list.first_child() {
             list.remove(&child.downcast::<gtk::ListBoxRow>().unwrap());
         }
-        
+
         // 1. Unified Inbox - ActionRow directly in ListBox (ActionRow IS a ListBoxRow)
         let inbox = adw::ActionRow::builder()
             .subtitle(&gettext("Unified Inbox"))
             .icon_name("mail-read-symbolic")
             .activatable(true)
             .build();
-        unsafe { inbox.set_data("unified-inbox", true); }
+        unsafe {
+            inbox.set_data("unified-inbox", true);
+        }
         list.append(&inbox);
-        
+
         // Get all servers (ntfy.sh + custom servers)
         let settings = gio::Settings::new(crate::config::APP_ID);
         let mut all_servers = Vec::new();
 
         if settings.boolean("show-default-server") {
-             all_servers.push("https://ntfy.sh".to_string());
+            all_servers.push("https://ntfy.sh".to_string());
         }
 
         all_servers.extend(
-            settings.strv("custom-servers")
+            settings
+                .strv("custom-servers")
                 .into_iter()
-                .map(|s| s.to_string())
+                .map(|s| s.to_string()),
         );
-        
+
         // Group subscriptions by server
-        let mut subs_by_server: std::collections::HashMap<String, Vec<Subscription>> = std::collections::HashMap::new();
+        let mut subs_by_server: std::collections::HashMap<String, Vec<Subscription>> =
+            std::collections::HashMap::new();
         if let Some(sort_model) = imp.subscription_sort_model.get() {
             for i in 0..sort_model.n_items() {
                 if let Some(sub) = sort_model.item(i).and_downcast::<Subscription>() {
@@ -687,13 +713,13 @@ impl NtfyrWindow {
                 }
             }
         }
-        
+
         // 2. For each server: server ActionRow, then topics or placeholder
         for server in &all_servers {
             // Server ActionRow - directly in ListBox
             let server_row = self.build_server_action_row(server);
             list.append(&server_row);
-            
+
             // Topics or placeholder
             if let Some(subs) = subs_by_server.get(server) {
                 for sub in subs {
@@ -713,7 +739,7 @@ impl NtfyrWindow {
         } else {
             "network-server-symbolic"
         };
-        
+
         // Adw.ActionRow { subtitle, icon-name, selectable: false, styles ["background"] }
         let action_row = adw::ActionRow::builder()
             .subtitle(server)
@@ -721,13 +747,13 @@ impl NtfyrWindow {
             .selectable(false)
             .build();
         action_row.add_css_class("background");
-        
+
         // Gtk.Box { hexpand: true; halign: end; styles ["linked"] }
         let button_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         button_box.set_hexpand(true);
         button_box.set_halign(gtk::Align::End);
         button_box.add_css_class("linked");
-        
+
         // MenuButton { icon-name: view-more-symbolic, tooltip: Server Actions, flat }
         let menu_btn = gtk::MenuButton::builder()
             .icon_name("view-more-symbolic")
@@ -747,11 +773,9 @@ impl NtfyrWindow {
 
         // Helper to create styled menu rows
         let create_menu_row = |label: &str, icon_name: &str| -> gtk::Button {
-            let btn = gtk::Button::builder()
-                .halign(gtk::Align::Fill)
-                .build();
+            let btn = gtk::Button::builder().halign(gtk::Align::Fill).build();
             btn.add_css_class("flat");
-            
+
             let box_ = gtk::Box::new(gtk::Orientation::Horizontal, 12);
             let icon = gtk::Image::from_icon_name(icon_name);
             let lbl = gtk::Label::builder()
@@ -759,7 +783,7 @@ impl NtfyrWindow {
                 .xalign(0.0)
                 .hexpand(true)
                 .build();
-            
+
             box_.append(&icon);
             box_.append(&lbl);
             btn.set_child(Some(&box_));
@@ -782,12 +806,12 @@ impl NtfyrWindow {
         let add_account_btn = create_menu_row(&gettext("Add Account"), "contact-new-symbolic");
         let server_clone = server.to_string();
         let popover_clone = popover.clone();
-            add_account_btn.connect_clicked(move |btn| {
-                popover_clone.popdown();
-                if let Some(window) = btn.root().and_downcast::<NtfyrWindow>() {
-                    window.on_add_account_clicked(&server_clone);
-                }
-            });
+        add_account_btn.connect_clicked(move |btn| {
+            popover_clone.popdown();
+            if let Some(window) = btn.root().and_downcast::<NtfyrWindow>() {
+                window.on_add_account_clicked(&server_clone);
+            }
+        });
         menu_box.append(&add_account_btn);
 
         // Remove Server Item (only custom)
@@ -805,25 +829,27 @@ impl NtfyrWindow {
             });
             menu_box.append(&remove_btn);
         } else {
-             let hide_btn = create_menu_row(&gettext("Hide Server"), "view-hidden-symbolic");
-             hide_btn.add_css_class("destructive-action"); // Optional: style it destructively or normally
- 
-             let popover_clone = popover.clone();
-             hide_btn.connect_clicked(move |btn| {
-                 popover_clone.popdown();
-                 if let Some(window) = btn.root().and_downcast::<NtfyrWindow>() {
-                     window.on_hide_server_clicked();
-                 }
-             });
-             menu_box.append(&hide_btn);
+            let hide_btn = create_menu_row(&gettext("Hide Server"), "view-hidden-symbolic");
+            hide_btn.add_css_class("destructive-action"); // Optional: style it destructively or normally
+
+            let popover_clone = popover.clone();
+            hide_btn.connect_clicked(move |btn| {
+                popover_clone.popdown();
+                if let Some(window) = btn.root().and_downcast::<NtfyrWindow>() {
+                    window.on_hide_server_clicked();
+                }
+            });
+            menu_box.append(&hide_btn);
         }
 
         popover.set_child(Some(&menu_box));
         menu_btn.set_popover(Some(&popover));
         button_box.append(&menu_btn);
-        
+
         action_row.add_suffix(&button_box);
-        unsafe { action_row.set_data("server-row", true); }
+        unsafe {
+            action_row.set_data("server-row", true);
+        }
         action_row
     }
 
@@ -834,18 +860,20 @@ impl NtfyrWindow {
             .icon_name("mail-mark-important-symbolic")
             .selectable(false)
             .build();
-        unsafe { action_row.set_data("placeholder", true); }
+        unsafe {
+            action_row.set_data("placeholder", true);
+        }
         action_row
     }
 
     fn attach_sort_trigger(&self, sub: &Subscription) {
         let imp = self.imp();
         let sorter = imp.subscription_sorter.get().unwrap().clone();
-        
+
         let trigger_sort = move |_: &Subscription, _: &glib::ParamSpec| {
             sorter.changed(gtk::SorterChange::Different);
         };
-        
+
         sub.connect_notify_local(Some("server"), trigger_sort.clone());
         sub.connect_notify_local(Some("topic"), trigger_sort);
     }
@@ -895,24 +923,25 @@ impl NtfyrWindow {
                 }
             });
 
-            let sort_model = gtk::SortListModel::new(Some(sub.imp().messages.clone()), Some(sorter));
+            let sort_model =
+                gtk::SortListModel::new(Some(sub.imp().messages.clone()), Some(sorter));
 
             let sub_for_rows = sub.clone();
             let this = self.clone();
-            imp.message_list
-                .bind_model(Some(&sort_model), move |obj| {
-                    let b = obj.downcast_ref::<glib::BoxedAnyObject>().unwrap();
-                    let msg = b.borrow::<models::ReceivedMessage>();
-                    let id = msg.id.clone();
-                    let sub = sub_for_rows.clone();
-                    let this = this.clone();
-                    MessageRow::new(msg.clone(), move || {
-                        let sub = sub.clone();
-                        let id = id.clone();
-                        this.error_boundary().spawn(async move { sub.delete_message(id).await });
-                    })
-                    .upcast()
-                });
+            imp.message_list.bind_model(Some(&sort_model), move |obj| {
+                let b = obj.downcast_ref::<glib::BoxedAnyObject>().unwrap();
+                let msg = b.borrow::<models::ReceivedMessage>();
+                let id = msg.id.clone();
+                let sub = sub_for_rows.clone();
+                let this = this.clone();
+                MessageRow::new(msg.clone(), move || {
+                    let sub = sub.clone();
+                    let id = id.clone();
+                    this.error_boundary()
+                        .spawn(async move { sub.delete_message(id).await });
+                })
+                .upcast()
+            });
 
             let this = self.clone();
             imp.banner_binding.set(Some((
@@ -951,12 +980,12 @@ impl NtfyrWindow {
             .icon_name("lang-include-symbolic")
             .activatable(true)
             .build();
-        
+
         // Bind title to display-name
         sub.bind_property("display-name", &action_row, "title")
             .sync_create()
             .build();
-        
+
         // Gtk.Box { icons }
         let icon_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
@@ -964,14 +993,18 @@ impl NtfyrWindow {
         let schedule = gtk::Image::new();
         schedule.set_icon_name(Some("alarm-symbolic"));
         schedule.set_visible(false);
-        sub.bind_property("has-schedule", &schedule, "visible").sync_create().build();
+        sub.bind_property("has-schedule", &schedule, "visible")
+            .sync_create()
+            .build();
         icon_box.append(&schedule);
 
         // Gtk.Image { icon-name: "edit-find-replace-symbolic" } - filters
         let filter = gtk::Image::new();
         filter.set_icon_name(Some("edit-find-replace-symbolic"));
         filter.set_visible(false);
-        sub.bind_property("has-rules", &filter, "visible").sync_create().build();
+        sub.bind_property("has-rules", &filter, "visible")
+            .sync_create()
+            .build();
         icon_box.append(&filter);
 
         // Gtk.Image { network-error-symbolic / network-cellular-signal-weak-symbolic } - status
@@ -979,15 +1012,15 @@ impl NtfyrWindow {
         status.set_visible(false);
         let status_clone = status.clone();
         sub.connect_status_notify(move |sub| match sub.nice_status() {
-             Status::Down => {
-                 status_clone.set_icon_name(Some("network-error-symbolic"));
-                 status_clone.set_visible(true);
-             }
-             Status::Degraded => {
-                 status_clone.set_icon_name(Some("network-cellular-signal-weak-symbolic"));
-                 status_clone.set_visible(true);
-             }
-             _ => status_clone.set_visible(false),
+            Status::Down => {
+                status_clone.set_icon_name(Some("network-error-symbolic"));
+                status_clone.set_visible(true);
+            }
+            Status::Degraded => {
+                status_clone.set_icon_name(Some("network-cellular-signal-weak-symbolic"));
+                status_clone.set_visible(true);
+            }
+            _ => status_clone.set_visible(false),
         });
         icon_box.append(&status);
 
@@ -995,14 +1028,18 @@ impl NtfyrWindow {
         let muted = gtk::Image::new();
         muted.set_icon_name(Some("notifications-disabled-symbolic"));
         muted.set_visible(false);
-        sub.bind_property("muted", &muted, "visible").sync_create().build();
+        sub.bind_property("muted", &muted, "visible")
+            .sync_create()
+            .build();
         icon_box.append(&muted);
 
         // Gtk.Image { icon-name: "channel-secure-symbolic" } - reserved
         let reserved = gtk::Image::new();
         reserved.set_icon_name(Some("channel-secure-symbolic"));
         reserved.set_visible(false);
-        sub.bind_property("reserved", &reserved, "visible").sync_create().build();
+        sub.bind_property("reserved", &reserved, "visible")
+            .sync_create()
+            .build();
         icon_box.append(&reserved);
 
         // Gtk.Label { valign: center; margin-start: 5; label } - unread count
@@ -1012,20 +1049,20 @@ impl NtfyrWindow {
         badge.set_visible(false);
         let badge_clone = badge.clone();
         sub.connect_unread_count_notify(move |sub| {
-             let c = sub.unread_count();
-             badge_clone.set_label(&c.to_string());
-             badge_clone.set_visible(c > 0);
+            let c = sub.unread_count();
+            badge_clone.set_label(&c.to_string());
+            badge_clone.set_visible(c > 0);
         });
         icon_box.append(&badge);
 
         action_row.add_suffix(&icon_box);
-        
+
         // Store topic and server for lookup when clicked
-        unsafe { 
+        unsafe {
             action_row.set_data("topic", sub.topic());
             action_row.set_data("server", sub.server());
         }
-        
+
         action_row
     }
 
@@ -1077,29 +1114,40 @@ impl NtfyrWindow {
     pub fn on_add_server_clicked(&self) {
         let dialog = AddServerDialog::new();
         dialog.present(Some(self));
-        
+
         let this = self.clone();
         let dialog_clone = dialog.clone();
         dialog.connect_local("add-request", true, move |_| {
-             let url = dialog_clone.server_url();
-             
-             // Check if server already exists
-             let settings = gio::Settings::new(crate::config::APP_ID);
-             let mut servers: Vec<String> = settings.strv("custom-servers").into_iter().map(|s| s.to_string()).collect();
-             
-             if !servers.contains(&url) && url != "https://ntfy.sh" {
-                 servers.push(url);
-                 let _ = settings.set_strv("custom-servers", servers.iter().map(|s| s.as_str()).collect::<Vec<&str>>().as_slice());
-                 
-                 let toast = adw::Toast::new(&gettext("Server added successfully"));
-                 this.imp().toast_overlay.add_toast(toast);
-             } else if servers.contains(&url) {
-                  let toast = adw::Toast::new(&gettext("Server already exists"));
-                  this.imp().toast_overlay.add_toast(toast);
-             }
-             
-             dialog_clone.close();
-             None
+            let url = dialog_clone.server_url();
+
+            // Check if server already exists
+            let settings = gio::Settings::new(crate::config::APP_ID);
+            let mut servers: Vec<String> = settings
+                .strv("custom-servers")
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
+
+            if !servers.contains(&url) && url != "https://ntfy.sh" {
+                servers.push(url);
+                let _ = settings.set_strv(
+                    "custom-servers",
+                    servers
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>()
+                        .as_slice(),
+                );
+
+                let toast = adw::Toast::new(&gettext("Server added successfully"));
+                this.imp().toast_overlay.add_toast(toast);
+            } else if servers.contains(&url) {
+                let toast = adw::Toast::new(&gettext("Server already exists"));
+                this.imp().toast_overlay.add_toast(toast);
+            }
+
+            dialog_clone.close();
+            None
         });
     }
 
@@ -1130,15 +1178,26 @@ impl NtfyrWindow {
 
     pub fn remove_server(&self, server: &str) {
         let settings = gio::Settings::new(crate::config::APP_ID);
-        let mut servers: Vec<String> = settings.strv("custom-servers").into_iter().map(|s| s.to_string()).collect();
+        let mut servers: Vec<String> = settings
+            .strv("custom-servers")
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
         servers.retain(|s| s != server);
-        let _ = settings.set_strv("custom-servers", servers.iter().map(|s| s.as_str()).collect::<Vec<&str>>().as_slice());
+        let _ = settings.set_strv(
+            "custom-servers",
+            servers
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>()
+                .as_slice(),
+        );
     }
 
     pub fn on_hide_server_clicked(&self) {
         let settings = gio::Settings::new(crate::config::APP_ID);
         let _ = settings.set_boolean("show-default-server", false);
-        
+
         // Also show a toast so user knows how to bring it back
         let toast = adw::Toast::new(&gettext(
             "Default server hidden. You can restore it in Preferences.",
@@ -1191,21 +1250,25 @@ impl NtfyrWindow {
     fn setup_app_lock(&self) {
         let imp = self.imp();
         let is_locked = imp.settings.boolean("app-lock-enabled");
-        
+
         if is_locked {
             imp.main_stack.set_visible_child(&*imp.lock_view);
-            
+
             let this = self.clone();
             imp.lock_view.imp().unlock_button.connect_clicked(move |_| {
                 this.request_unlock();
             });
-            
+
             let this = self.clone();
-            imp.lock_view.imp().password_entry.connect_activate(move |_| {
-                this.request_unlock();
-            });
+            imp.lock_view
+                .imp()
+                .password_entry
+                .connect_activate(move |_| {
+                    this.request_unlock();
+                });
         } else {
-            imp.main_stack.set_visible_child(&*imp.navigation_split_view);
+            imp.main_stack
+                .set_visible_child(&*imp.navigation_split_view);
         }
     }
 
@@ -1214,54 +1277,59 @@ impl NtfyrWindow {
         let controller = gtk::EventControllerLegacy::new();
         let this = self.clone();
         controller.connect_event(move |_, _| {
-             this.imp().last_activity.set(std::time::Instant::now());
-             glib::Propagation::Proceed
+            this.imp().last_activity.set(std::time::Instant::now());
+            glib::Propagation::Proceed
         });
         self.add_controller(controller);
 
         // Idle check loop
         let this = self.clone();
         glib::MainContext::default().spawn_local(async move {
-             loop {
-                 glib::timeout_future_seconds(10).await;
-                 
-                 let imp = this.imp();
-                 let settings = &imp.settings;
-                 
-                 // Check if auto-lock is enabled
-                 if !settings.boolean("auto-lock-enabled") {
-                     continue;
-                 }
-                 
-                 // Check if already locked
-                 if imp.main_stack.visible_child().map(|w| w == *imp.lock_view).unwrap_or(false) {
-                     continue;
-                 }
+            loop {
+                glib::timeout_future_seconds(10).await;
 
-                 let timeout_secs = settings.int("lock-timeout") as u64;
-                 let elapsed = imp.last_activity.get().elapsed().as_secs();
-                 
-                 if elapsed >= timeout_secs {
-                     info!("Auto-lock timeout reached ({}s), locking app.", elapsed);
-                     this.lock_app();
-                 }
-             }
+                let imp = this.imp();
+                let settings = &imp.settings;
+
+                // Check if auto-lock is enabled
+                if !settings.boolean("auto-lock-enabled") {
+                    continue;
+                }
+
+                // Check if already locked
+                if imp
+                    .main_stack
+                    .visible_child()
+                    .map(|w| w == *imp.lock_view)
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+
+                let timeout_secs = settings.int("lock-timeout") as u64;
+                let elapsed = imp.last_activity.get().elapsed().as_secs();
+
+                if elapsed >= timeout_secs {
+                    info!("Auto-lock timeout reached ({}s), locking app.", elapsed);
+                    this.lock_app();
+                }
+            }
         });
     }
 
     pub fn lock_app(&self) {
         let imp = self.imp();
-         // If app lock is enabled generally, switch to lock view
-         if imp.settings.boolean("app-lock-enabled") {
-             imp.main_stack.set_visible_child(&*imp.lock_view);
-         }
+        // If app lock is enabled generally, switch to lock view
+        if imp.settings.boolean("app-lock-enabled") {
+            imp.main_stack.set_visible_child(&*imp.lock_view);
+        }
     }
 
     fn request_unlock(&self) {
         let imp = self.imp();
         // Access via public method on wrapper, not imp()
         let entry_text = imp.lock_view.password_text();
-        
+
         let this = self.clone();
         self.error_boundary().spawn(async move {
             let unlocked = match crate::secrets::get_password().await {
@@ -1289,26 +1357,24 @@ impl NtfyrWindow {
                 glib::MainContext::default().spawn_local(async move {
                     let imp = this.imp();
                     imp.lock_view.clear_password(); // Clear
-                    imp.main_stack.set_visible_child(&*imp.navigation_split_view);
-                    
-                    if entry_text.is_empty() { 
-                         let toast = adw::Toast::new(&gettext(
-                             "Warning: No password set for App Lock.",
-                         ));
-                         this.imp().toast_overlay.add_toast(toast);
+                    imp.main_stack
+                        .set_visible_child(&*imp.navigation_split_view);
+
+                    if entry_text.is_empty() {
+                        let toast =
+                            adw::Toast::new(&gettext("Warning: No password set for App Lock."));
+                        this.imp().toast_overlay.add_toast(toast);
                     }
                 });
             } else {
                 warn!("Authentication failed");
                 glib::MainContext::default().spawn_local(async move {
-                     let toast = adw::Toast::new(&gettext("Incorrect password"));
-                     this.imp().toast_overlay.add_toast(toast);
-                     this.imp().lock_view.show_error();
+                    let toast = adw::Toast::new(&gettext("Incorrect password"));
+                    this.imp().toast_overlay.add_toast(toast);
+                    this.imp().lock_view.show_error();
                 });
             }
             Ok(())
         });
     }
-
 }
-

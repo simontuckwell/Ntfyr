@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::Error;
 
-
 pub const DEFAULT_SERVER: &str = "https://ntfy.sh";
 static EMOJI_MAP: OnceLock<HashMap<String, String>> = OnceLock::new();
 
@@ -71,7 +70,6 @@ pub struct ReceivedMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content_type: Option<String>,
 }
-
 
 impl ReceivedMessage {
     /// Whether the message body should be rendered as Markdown.

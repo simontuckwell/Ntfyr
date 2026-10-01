@@ -1,6 +1,6 @@
 use adw::subclass::prelude::*;
-use gtk::{glib, CompositeTemplate};
 use gtk::prelude::*;
+use gtk::{CompositeTemplate, glib};
 
 mod imp {
     use super::*;

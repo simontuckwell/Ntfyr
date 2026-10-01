@@ -241,7 +241,9 @@ pub async fn build_keyring(label: &str) -> Arc<dyn LightKeyring + Send + Sync> {
             Ok(collection) => {
                 return Arc::new(DBusKeyring { collection });
             }
-            Err(e) => warn!(store = label, error = %e, "Failed to open default Secret Service collection"),
+            Err(e) => {
+                warn!(store = label, error = %e, "Failed to open default Secret Service collection")
+            }
         },
         Err(e) => warn!(store = label, error = %e, "Secret Service DBus connection failed"),
     }

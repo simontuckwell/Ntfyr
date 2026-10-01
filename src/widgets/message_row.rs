@@ -1,12 +1,10 @@
-
-
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 
-use gettextrs::gettext;
-use gtk::{gdk, gio, glib};
 use crate::config::APP_ID;
 use gdk_pixbuf;
+use gettextrs::gettext;
+use gtk::{gdk, gio, glib};
 use ntfy_daemon::models;
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use tracing::error;
@@ -214,14 +212,13 @@ impl MessageRow {
         }
     }
     fn fetch_image_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
-        let path = glib::user_cache_dir().join("io.github.tobagin.Ntfyr").join(&url);
+        let path = glib::user_cache_dir()
+            .join("io.github.tobagin.Ntfyr")
+            .join(&url);
         let bytes = if path.exists() {
             std::fs::read(&path)?
         } else {
-            ureq::get(url)
-                .call()?
-                .into_body()
-                .read_to_vec()?
+            ureq::get(url).call()?.into_body().read_to_vec()?
         };
         Ok(bytes)
     }
@@ -257,9 +254,7 @@ impl MessageRow {
         match &action {
             models::Action::View { label, url, .. } => {
                 btn.set_label(&label);
-                btn.set_tooltip_text(Some(
-                    &gettext("Go to {}").replacen("{}", url, 1),
-                ));
+                btn.set_tooltip_text(Some(&gettext("Go to {}").replacen("{}", url, 1)));
                 btn.set_action_name(Some("app.message-action"));
                 btn.set_action_target_value(Some(&serde_json::to_string(&action).unwrap().into()));
             }
@@ -278,9 +273,7 @@ impl MessageRow {
             models::Action::Broadcast { label, .. } => {
                 btn.set_label(&label);
                 btn.set_sensitive(false);
-                btn.set_tooltip_text(Some(&gettext(
-                    "Broadcast action only available on Android",
-                )));
+                btn.set_tooltip_text(Some(&gettext("Broadcast action only available on Android")));
             }
         }
         btn

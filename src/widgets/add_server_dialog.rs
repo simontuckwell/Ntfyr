@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gettextrs::gettext;
@@ -6,6 +5,7 @@ use glib::subclass::Signal;
 use gtk::gio;
 use gtk::glib;
 use once_cell::sync::Lazy;
+use std::cell::RefCell;
 
 #[derive(Default, Debug, Clone)]
 pub struct Widgets {
@@ -117,7 +117,7 @@ impl AddServerDialog {
             .delegate()
             .unwrap()
             .connect_changed(move |_| f.clone()());
-        
+
         // Initial check
         debounced_check();
 
@@ -138,12 +138,12 @@ impl AddServerDialog {
         let w = self.imp().widgets.borrow();
         let text = w.server_entry.text();
         let is_valid = text.starts_with("http://") || text.starts_with("https://");
-        
+
         w.add_btn.set_sensitive(is_valid);
         if !text.is_empty() && !is_valid {
-             w.server_entry.add_css_class("error");
+            w.server_entry.add_css_class("error");
         } else {
-             w.server_entry.remove_css_class("error");
+            w.server_entry.remove_css_class("error");
         }
     }
 

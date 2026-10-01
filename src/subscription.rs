@@ -3,10 +3,10 @@ use std::future::Future;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use glib::subclass::prelude::*;
 use glib::Properties;
+use glib::subclass::prelude::*;
 use gtk::{gio, glib};
-use ntfy_daemon::{models, ConnectionState, ListenerEvent};
+use ntfy_daemon::{ConnectionState, ListenerEvent, models};
 use tracing::{error, instrument};
 
 #[repr(u16)]
@@ -142,7 +142,7 @@ impl Subscription {
         reserved: bool,
     ) {
         let imp = self.imp();
-        
+
         // Calculate flags before moving ownership
         let has_rules = rules.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
         let has_schedule = schedule.is_some();
@@ -155,19 +155,19 @@ impl Subscription {
         self.notify_muted();
         imp.read_until.replace(read_until);
         self.notify_unread_count();
-        
+
         // Move objects
         imp.rules.replace(rules);
         imp.schedule.replace(schedule);
-        
+
         self._set_display_name(display_name.to_string());
-        
+
         imp.reserved.set(reserved);
         self.notify_reserved();
-        
+
         imp.has_rules.set(has_rules);
         self.notify_has_rules();
-        
+
         imp.has_schedule.set(has_schedule);
         self.notify_has_schedule();
     }
@@ -281,15 +281,18 @@ impl Subscription {
         self.imp().rules.borrow().clone()
     }
 
-    pub fn set_rules(&self, rules: Option<Vec<models::FilterRule>>) -> impl Future<Output = anyhow::Result<()>> {
+    pub fn set_rules(
+        &self,
+        rules: Option<Vec<models::FilterRule>>,
+    ) -> impl Future<Output = anyhow::Result<()>> {
         let this = self.clone();
         async move {
             let has_rules = rules.as_ref().map(|v| !v.is_empty()).unwrap_or(false);
             this.imp().rules.replace(rules);
-            
+
             this.imp().has_rules.set(has_rules);
             this.notify_has_rules();
-            
+
             this.send_updated_info().await
         }
     }
@@ -298,12 +301,15 @@ impl Subscription {
         self.imp().schedule.borrow().clone()
     }
 
-    pub fn set_schedule(&self, schedule: Option<models::Schedule>) -> impl Future<Output = anyhow::Result<()>> {
+    pub fn set_schedule(
+        &self,
+        schedule: Option<models::Schedule>,
+    ) -> impl Future<Output = anyhow::Result<()>> {
         let this = self.clone();
         async move {
             let has_schedule = schedule.is_some();
             this.imp().schedule.replace(schedule);
-             
+
             this.imp().has_schedule.set(has_schedule);
             this.notify_has_schedule();
 
@@ -322,7 +328,7 @@ impl Subscription {
     fn update_unread_count(&self) {
         let imp = self.imp();
         let read_until = imp.read_until.get();
-        
+
         // Count messages that are newer than read_until
         let mut unread = 0u32;
         for i in 0..imp.messages.n_items() {
@@ -335,7 +341,7 @@ impl Subscription {
                 }
             }
         }
-        
+
         imp.unread_count.set(unread);
         self.notify_unread_count();
     }
@@ -370,7 +376,11 @@ impl Subscription {
 
         Ok(())
     }
-    pub async fn publish_msg(&self, mut msg: models::OutgoingMessage, encrypt: bool) -> anyhow::Result<()> {
+    pub async fn publish_msg(
+        &self,
+        mut msg: models::OutgoingMessage,
+        encrypt: bool,
+    ) -> anyhow::Result<()> {
         let imp = self.imp();
         msg.topic = self.topic();
         imp.client.get().unwrap().publish(msg, encrypt).await?;
@@ -378,7 +388,12 @@ impl Subscription {
     }
     #[instrument(skip_all)]
     pub async fn clear_notifications(&self) -> anyhow::Result<()> {
-        self.imp().client.get().unwrap().clear_notifications().await?;
+        self.imp()
+            .client
+            .get()
+            .unwrap()
+            .clear_notifications()
+            .await?;
         Ok(())
     }
 

@@ -49,8 +49,7 @@ pub fn language_labels() -> Vec<String> {
 }
 
 pub fn init() {
-    gettextrs::bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR)
-        .expect("Unable to bind the text domain");
+    gettextrs::bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR).expect("Unable to bind the text domain");
     gettextrs::textdomain(GETTEXT_PACKAGE).expect("Unable to switch to the text domain");
 
     let settings = gio::Settings::new(APP_ID);

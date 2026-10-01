@@ -3,8 +3,8 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use glib::subclass::Signal;
 use gtk::{gio, glib};
-use once_cell::sync::Lazy;
 use ntfy_daemon::models::Account;
+use once_cell::sync::Lazy;
 
 mod imp {
     use super::*;
@@ -39,8 +39,7 @@ mod imp {
 
     impl ObjectImpl for NtfyrAccountDialog {
         fn signals() -> &'static [Signal] {
-            static SIGNALS: Lazy<Vec<Signal>> =
-                Lazy::new(|| vec![Signal::builder("save").build()]);
+            static SIGNALS: Lazy<Vec<Signal>> = Lazy::new(|| vec![Signal::builder("save").build()]);
             SIGNALS.as_ref()
         }
     }
@@ -73,12 +72,12 @@ impl NtfyrAccountDialog {
 
     pub fn set_account(&self, account: &Account) {
         let imp = self.imp();
-        
+
         // Server context is already set via new() or we should verify matches?
-        // Ideally set_account is used when editing existing account. 
+        // Ideally set_account is used when editing existing account.
         // If we want to support editing, we might need to ensure server matches or update it?
         // But for now, we assume dialog is opened for a specific server context.
-        
+
         imp.username_entry.set_text(&account.username);
         imp.save_btn.set_label(&gettext("Save"));
         self.set_title(&gettext("Edit Account"));
@@ -86,8 +85,12 @@ impl NtfyrAccountDialog {
 
     pub fn account_data(&self) -> (String, String, String) {
         let imp = self.imp();
-        
-        let server = imp.server_url.get().map(|s| s.as_str()).unwrap_or("https://ntfy.sh");
+
+        let server = imp
+            .server_url
+            .get()
+            .map(|s| s.as_str())
+            .unwrap_or("https://ntfy.sh");
 
         (
             server.into(),

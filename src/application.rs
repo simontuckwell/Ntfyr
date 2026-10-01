@@ -6,15 +6,18 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use futures::stream::Stream;
 use gtk::{gdk, gio, glib};
-use ntfy_daemon::models;
 use ntfy_daemon::NtfyHandle;
+use ntfy_daemon::models;
 use tracing::{debug, error, info, warn};
 
 use gettextrs::gettext;
 
 use crate::config::{APP_ID, PKGDATADIR, PROFILE, RELEASE_VERSION, VERSION};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use crate::tray;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 // Unlock feature
 use crate::widgets::NtfyrWindow;
@@ -159,22 +162,23 @@ mod imp {
             if let Ok(handle) = crate::tray::spawn_tray(visible, has_unread) {
                 app.imp().tray.set(handle).ok();
             } else {
-                 warn!("Failed to spawn tray icon");
+                warn!("Failed to spawn tray icon");
             }
 
             app.setup_css();
             app.setup_gactions();
             app.setup_accels();
             // Sync Autostart Action
-            let action_sync_autostart = gio::SimpleAction::new("sync-autostart", Some(glib::VariantTy::BOOLEAN));
+            let action_sync_autostart =
+                gio::SimpleAction::new("sync-autostart", Some(glib::VariantTy::BOOLEAN));
             action_sync_autostart.connect_activate(|_, parameter| {
-                 let enabled = parameter.unwrap().get::<bool>().unwrap();
-                 crate::async_utils::RUNTIME.spawn(async move {
+                let enabled = parameter.unwrap().get::<bool>().unwrap();
+                crate::async_utils::RUNTIME.spawn(async move {
                     // Call the static helper method on the wrapper type
                     if let Err(e) = super::NtfyrApplication::run_in_background(enabled).await {
                         warn!("Failed to sync autostart: {}", e);
                     }
-                 });
+                });
             });
             app.add_action(&action_sync_autostart);
 
@@ -315,14 +319,14 @@ impl NtfyrApplication {
             message_action,
             action_purge_default,
         ]);
-        
+
         let action_toggle_window = gio::ActionEntry::builder("toggle-window")
             .activate(move |app: &Self, _, _| {
                 if let Some(win) = app.imp().window.borrow().upgrade() {
                     if win.is_visible() {
-                         win.set_visible(false);
+                        win.set_visible(false);
                     } else {
-                         win.present();
+                        win.present();
                     }
                 } else {
                     app.ensure_window_present();
@@ -415,8 +419,11 @@ impl NtfyrApplication {
             Some(RELEASE_VERSION),
         );
         dialog.set_version(VERSION);
-        
-        dialog.add_link(&gettext("Support Questions"), "https://github.com/tobagin/Ntfyr/discussions");
+
+        dialog.add_link(
+            &gettext("Support Questions"),
+            "https://github.com/tobagin/Ntfyr/discussions",
+        );
 
         // "Name https://…" makes the name a clickable link in the Credits page.
         dialog.set_developers(&[
@@ -437,7 +444,7 @@ impl NtfyrApplication {
                 "gettext-rs https://github.com/gettext-rs/gettext-rs",
             ],
         );
-        
+
         dialog.set_copyright(&gettext("© 2019-2026 The Ntfyr Team"));
         dialog.set_license_type(gtk::License::Gpl30);
 
@@ -448,7 +455,8 @@ impl NtfyrApplication {
 
     fn show_shortcuts(&self) {
         let builder = gtk::Builder::from_resource("/io/github/tobagin/Ntfyr/gtk/help-overlay.ui");
-        let dialog: adw::ShortcutsDialog = builder.object("help_overlay")
+        let dialog: adw::ShortcutsDialog = builder
+            .object("help_overlay")
             .expect("shortcuts.ui MUST have help_overlay object");
         if let Some(w) = self.imp().window.borrow().upgrade() {
             dialog.present(Some(&w));
@@ -467,14 +475,12 @@ impl NtfyrApplication {
 
         glib::ExitCode::from(self.run_with_args(&std::env::args().collect::<Vec<_>>()))
     }
-    
-
-
-
-
 
     async fn run_in_background(autostart: bool) -> anyhow::Result<()> {
-        info!(autostart_request = autostart, "Initiating background portal request via ashpd");
+        info!(
+            autostart_request = autostart,
+            "Initiating background portal request via ashpd"
+        );
 
         let request = ashpd::desktop::background::Background::request()
             .reason("Receive notifications in the background")
@@ -486,19 +492,17 @@ impl NtfyrApplication {
 
         // Set status for GNOME Background Apps
         // Currently ashpd doesn't expose SetStatus directly on Background proxy helper easily?
-        // Actually it might not be needed if RequestBackground works. 
+        // Actually it might not be needed if RequestBackground works.
         // Karere doesn't seem to set status in the snippet I saw?
-        // But Ntfyr did. 
+        // But Ntfyr did.
         // We can use zbus for status if needed, or rely on Background portal.
         // Let's stick to what ashpd provides. If SetStatus is needed we can add it later.
-        // However, ashpd 0.12 might implicitly handle things? 
+        // However, ashpd 0.12 might implicitly handle things?
         // Let's check if we can set status via ashpd or if we should just drop it for now (Karere doesn't seem to use it in the snippet).
         // Actually, if we look at Karere usage, it just calls `request()`.
-        
+
         Ok(())
     }
-
-
 
     fn ensure_rpc_running(&self) {
         let dbpath = glib::user_data_dir().join("io.github.tobagin.Ntfyr.sqlite");
@@ -545,7 +549,7 @@ impl NtfyrApplication {
                 // Build portal notification
                 let mut portal_notif = ashpd::desktop::notification::Notification::new(&n.title);
                 portal_notif = portal_notif.body(n.body.as_str());
-                
+
                 // Add action buttons
                 for a in n.actions.iter() {
                     match a {
@@ -606,7 +610,7 @@ impl NtfyrApplication {
         let ntfy = self.imp().ntfy.get().unwrap();
 
         let window = NtfyrWindow::new(self, ntfy.clone());
-        
+
         let visible = self.imp().tray_visible.clone();
         let app = self.clone();
         window.connect_notify_local(Some("visible"), move |win, _| {
@@ -618,8 +622,10 @@ impl NtfyrApplication {
             app.update_tray();
         });
         // Sync initial state
-        self.imp().tray_visible.store(window.is_visible(), Ordering::Relaxed);
-        
+        self.imp()
+            .tray_visible
+            .store(window.is_visible(), Ordering::Relaxed);
+
         *self.imp().window.borrow_mut() = window.downgrade();
     }
     fn set_unread(&self, unread: bool) {

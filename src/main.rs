@@ -4,10 +4,10 @@ mod config;
 mod async_utils;
 pub mod error;
 mod i18n;
-mod subscription;
-pub mod widgets;
-mod tray;
 pub mod secrets;
+mod subscription;
+mod tray;
+pub mod widgets;
 
 use gettextrs::gettext;
 use gtk::{gio, glib};

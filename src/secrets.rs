@@ -17,7 +17,9 @@ pub async fn store_password(password: &str) -> Result<()> {
         item.delete().await?;
     }
 
-    keyring.create_item(LABEL, &attributes, password, true).await?;
+    keyring
+        .create_item(LABEL, &attributes, password, true)
+        .await?;
     Ok(())
 }
 

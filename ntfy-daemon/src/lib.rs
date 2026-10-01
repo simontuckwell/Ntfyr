@@ -1,7 +1,7 @@
 mod actor_utils;
 pub mod credentials;
-pub mod keys;
 mod http_client;
+pub mod keys;
 mod listener;
 pub mod message_repo;
 pub mod models;

@@ -212,7 +212,6 @@ impl AdvancedMessageDialog {
             }
         }
 
-
         let lang = gsv::LanguageManager::default().language("json").unwrap();
         let buffer = gsv::Buffer::with_language(&lang);
         buffer.set_text(&format!(

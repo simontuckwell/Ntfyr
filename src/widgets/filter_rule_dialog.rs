@@ -1,7 +1,7 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::glib;
-use ntfy_daemon::models::{FilterRule, FilterAction};
+use ntfy_daemon::models::{FilterAction, FilterRule};
 
 mod imp {
     use super::*;
@@ -46,7 +46,7 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             let this = self.obj();
-            
+
             // Connect signals
             let this_weak = this.downgrade();
             self.add_btn.connect_clicked(move |_| {
@@ -55,7 +55,7 @@ mod imp {
                     this.close();
                 }
             });
-            
+
             let this_weak = this.downgrade();
             self.cancel_btn.connect_clicked(move |_| {
                 if let Some(this) = this_weak.upgrade() {
@@ -78,7 +78,7 @@ impl FilterRuleDialog {
     pub fn new() -> Self {
         glib::Object::builder().build()
     }
-    
+
     pub fn get_rule(&self) -> Option<FilterRule> {
         let imp = self.imp();
         let name = imp.name_entry.text().to_string();
@@ -119,15 +119,15 @@ impl FilterRuleDialog {
             tags,
         })
     }
-    
+
     fn emit_rule_added(&self) {
         // Since we don't have a formal GSignal for this yet, we can use a closure/callback pattern
-        // or standard GAction. For simplicity, we assume the caller will connect to "closed" 
+        // or standard GAction. For simplicity, we assume the caller will connect to "closed"
         // and check get_rule(), but "closed" fires on cancel too.
-        // Better: Caller passes a callback or we define a signal. 
+        // Better: Caller passes a callback or we define a signal.
         // Let's use simple GAction approach for now: Caller connects to button? No, template child is private.
         // We will expose a helper or signal.
-        // For minimal implementation: We'll stick to `add_btn` signal being internal, 
+        // For minimal implementation: We'll stick to `add_btn` signal being internal,
         // and we simply expose an "response" signal? adw::Dialog has "closed".
         // Let's emit a proper signal "rule-added" using `full-glib-signals` would be best but requires more boilerplate.
         // Alternative: Pass a callback.

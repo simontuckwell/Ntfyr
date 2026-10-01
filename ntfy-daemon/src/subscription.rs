@@ -111,7 +111,11 @@ impl SubscriptionHandle {
     pub async fn publish(&self, msg: models::OutgoingMessage, encrypt: bool) -> anyhow::Result<()> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.command_tx
-            .send(SubscriptionCommand::Publish { msg, encrypt, resp_tx })
+            .send(SubscriptionCommand::Publish {
+                msg,
+                encrypt,
+                resp_tx,
+            })
             .await
             .unwrap();
         resp_rx.await.unwrap()
@@ -366,14 +370,20 @@ impl SubscriptionActor {
         let topic = &self.model.topic;
 
         if encrypt {
-             let key_str = self.env.keys.get(server, topic).ok_or_else(|| anyhow::anyhow!("Encryption requested but no key found"))?;
-             {
-                 use aes_gcm::{
+            let key_str = self
+                .env
+                .keys
+                .get(server, topic)
+                .ok_or_else(|| anyhow::anyhow!("Encryption requested but no key found"))?;
+            {
+                use aes_gcm::{
                     aead::{Aead, KeyInit},
-                    Aes256Gcm, Key, Nonce
+                    Aes256Gcm, Key, Nonce,
                 };
                 use base64::{engine::general_purpose, Engine as _};
-                let key_bytes = general_purpose::STANDARD.decode(key_str).map_err(|e| anyhow::anyhow!("Invalid key: {}", e))?;
+                let key_bytes = general_purpose::STANDARD
+                    .decode(key_str)
+                    .map_err(|e| anyhow::anyhow!("Invalid key: {}", e))?;
                 if key_bytes.len() != 32 {
                     return Err(anyhow::anyhow!(
                         "Invalid key length: expected 32 bytes, got {}",
@@ -388,9 +398,10 @@ impl SubscriptionActor {
                 let nonce = Nonce::from_slice(&nonce_bytes);
 
                 let plaintext = msg.message.as_deref().unwrap_or("").as_bytes();
-                let ciphertext = cipher.encrypt(nonce, plaintext)
+                let ciphertext = cipher
+                    .encrypt(nonce, plaintext)
                     .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
-                
+
                 // Format: version(1) + nonce(12) + ciphertext
                 let mut payload = Vec::with_capacity(1 + 12 + ciphertext.len());
                 payload.push(1); // Version 1
@@ -402,7 +413,7 @@ impl SubscriptionActor {
                 // Important: clear title/tags if we want full privacy?
                 // But user might want open title with encrypted body.
                 // We just encrypt the body as per ntfy spec.
-             }
+            }
         }
 
         debug!(server=?server, "preparing to publish message");
@@ -438,20 +449,28 @@ impl SubscriptionActor {
 
     fn check_schedule(&self) -> bool {
         // Returns true if notification should be MUTED
-        let Some(schedule) = &self.model.schedule else { return false };
-        
-        use chrono::{Local, Timelike, Datelike};
+        let Some(schedule) = &self.model.schedule else {
+            return false;
+        };
+
+        use chrono::{Datelike, Local, Timelike};
         let now = Local::now();
         let weekday = now.weekday().num_days_from_sunday() as u8;
 
         let parse_time = |s: &str| -> Option<(u32, u32)> {
             let parts: Vec<&str> = s.split(':').collect();
-            if parts.len() != 2 { return None; }
+            if parts.len() != 2 {
+                return None;
+            }
             Some((parts[0].parse().ok()?, parts[1].parse().ok()?))
         };
 
-        let Some((start_h, start_m)) = parse_time(&schedule.start_time) else { return false };
-        let Some((end_h, end_m)) = parse_time(&schedule.end_time) else { return false };
+        let Some((start_h, start_m)) = parse_time(&schedule.start_time) else {
+            return false;
+        };
+        let Some((end_h, end_m)) = parse_time(&schedule.end_time) else {
+            return false;
+        };
 
         let now_mins = now.hour() * 60 + now.minute();
         let start_mins = start_h * 60 + start_m;
@@ -467,7 +486,7 @@ impl SubscriptionActor {
             // It is quiet if:
             // 1. It's after start_mins AND today is enabled
             // 2. It's before end_mins AND yesterday was enabled
-            
+
             if now_mins >= start_mins && schedule.days.contains(&weekday) {
                 return true;
             }
@@ -506,8 +525,8 @@ impl SubscriptionActor {
         // Check for Discard rule BEFORE storage
         let filter_action = self.check_filters(&msg);
         if let Some(models::FilterAction::Discard) = &filter_action {
-             debug!(topic=?self.model.topic, "message discarded by filter rule");
-             return;
+            debug!(topic=?self.model.topic, "message discarded by filter rule");
+            return;
         }
 
         // ntfy notification updates are append-only: an update arrives as a new
@@ -517,7 +536,9 @@ impl SubscriptionActor {
         if is_update {
             let seq_key = msg.seq_key().to_string();
             if let Err(e) =
-                self.env.db.delete_by_seq_key(&self.model.server, &self.model.topic, &seq_key)
+                self.env
+                    .db
+                    .delete_by_seq_key(&self.model.server, &self.model.topic, &seq_key)
             {
                 error!(error=?e, topic=?self.model.topic, "failed to remove superseded message(s)");
             }
@@ -544,9 +565,9 @@ impl SubscriptionActor {
 
         if !already_stored {
             debug!(topic=?self.model.topic, muted=?self.model.muted, "checking if notification should be shown");
-            
+
             let mut muted = self.model.muted;
-            
+
             // Check filters for Mute
             if let Some(models::FilterAction::Mute) = filter_action {
                 muted = true;
@@ -555,15 +576,19 @@ impl SubscriptionActor {
             if let Some(models::FilterAction::MarkRead) = filter_action {
                 muted = true;
                 debug!("muted by mark_read filter");
-                
+
                 // Update read_until
-                if let Err(e) = self.env.db.update_read_until(&self.model.server, &self.model.topic, msg.time) {
+                if let Err(e) =
+                    self.env
+                        .db
+                        .update_read_until(&self.model.server, &self.model.topic, msg.time)
+                {
                     error!(error=?e, "failed to update read_until for mark_read rule");
                 } else {
                     self.model.read_until = msg.time;
                 }
             }
-            
+
             // Check Schedule
             if !muted && self.check_schedule() {
                 muted = true;
@@ -611,7 +636,9 @@ impl SubscriptionActor {
     fn handle_message_removed(&mut self, seq_id: String) {
         debug!(topic=?self.model.topic, seq_id=?seq_id, "removing cleared/deleted message");
         if let Err(e) =
-            self.env.db.delete_by_seq_key(&self.model.server, &self.model.topic, &seq_id)
+            self.env
+                .db
+                .delete_by_seq_key(&self.model.server, &self.model.topic, &seq_id)
         {
             error!(error=?e, topic=?self.model.topic, "failed to remove cleared/deleted message");
             return;
@@ -631,7 +658,11 @@ fn portal_notification_id(server: &str, topic: &str) -> Option<String> {
     hasher.update([0xff]);
     hasher.update(topic.as_bytes());
     let digest = hasher.finalize();
-    let slug: String = digest.iter().take(12).map(|b| format!("{:02x}", b)).collect();
+    let slug: String = digest
+        .iter()
+        .take(12)
+        .map(|b| format!("{:02x}", b))
+        .collect();
     Some(format!("io.github.tobagin.Ntfyr.z{slug}"))
 }
 

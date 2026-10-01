@@ -28,7 +28,7 @@ mod imp {
         pub muted_switch_row: TemplateChild<adw::SwitchRow>,
         #[template_child]
         pub encryption_key_entry: TemplateChild<adw::PasswordEntryRow>,
-        
+
         // Schedule
         #[template_child]
         pub schedule_enabled_switch: TemplateChild<adw::SwitchRow>,
@@ -68,25 +68,23 @@ mod imp {
             let this = self.obj().clone();
 
             let sub = this.subscription().unwrap();
-            self.display_name_entry
-                .set_text(&sub.display_name());
+            self.display_name_entry.set_text(&sub.display_name());
             self.topic_info_row.set_subtitle(&sub.topic());
             self.server_info_row.set_subtitle(&sub.server());
-            self.muted_switch_row
-                .set_active(sub.muted());
-            
+            self.muted_switch_row.set_active(sub.muted());
+
             // Init Schedule
             this.init_schedule_ui(&sub);
-             // Init Rules
+            // Init Rules
             this.init_rules_ui(&sub);
-             // Init Encryption
+            // Init Encryption
             this.init_encryption_ui(&sub);
 
             let debouncer = crate::async_utils::Debouncer::new();
             self.display_name_entry.connect_changed({
-                 let this = this.clone();
-                 let debouncer = debouncer.clone();
-                 move |entry| {
+                let this = this.clone();
+                let debouncer = debouncer.clone();
+                move |entry| {
                     let entry = entry.clone();
                     let this = this.clone();
                     debouncer.call(std::time::Duration::from_millis(500), move || {
@@ -94,18 +92,21 @@ mod imp {
                     })
                 }
             });
-            
+
             // Schedule Signals
             let this_weak = this.downgrade();
-            self.schedule_enabled_switch.connect_active_notify(move |_| {
-                if let Some(this) = this_weak.upgrade() {
-                    this.update_schedule();
-                }
-            });
+            self.schedule_enabled_switch
+                .connect_active_notify(move |_| {
+                    if let Some(this) = this_weak.upgrade() {
+                        this.update_schedule();
+                    }
+                });
             let this_weak = this.downgrade();
             let debouncer_clone = debouncer.clone();
             self.schedule_start_entry.connect_changed(move |_| {
-                let Some(this) = this_weak.upgrade() else { return; };
+                let Some(this) = this_weak.upgrade() else {
+                    return;
+                };
                 let debouncer = debouncer_clone.clone();
                 debouncer.call(std::time::Duration::from_millis(500), move || {
                     this.update_schedule();
@@ -114,23 +115,25 @@ mod imp {
             let this_weak = this.downgrade();
             let debouncer_clone = debouncer.clone();
             self.schedule_end_entry.connect_changed(move |_| {
-                let Some(this) = this_weak.upgrade() else { return; };
+                let Some(this) = this_weak.upgrade() else {
+                    return;
+                };
                 let debouncer = debouncer_clone.clone();
                 debouncer.call(std::time::Duration::from_millis(500), move || {
                     this.update_schedule();
                 });
             });
-            
+
             // Bind day toggles
             let mut i = self.schedule_days_box.first_child();
             while let Some(child) = i {
                 if let Some(btn) = child.downcast_ref::<gtk::ToggleButton>() {
-                     let this_weak = this.downgrade();
-                     btn.connect_toggled(move |_| {
-                         if let Some(this) = this_weak.upgrade() {
-                             this.update_schedule();
-                         }
-                     });
+                    let this_weak = this.downgrade();
+                    btn.connect_toggled(move |_| {
+                        if let Some(this) = this_weak.upgrade() {
+                            this.update_schedule();
+                        }
+                    });
                 }
                 i = child.next_sibling();
             }
@@ -138,9 +141,9 @@ mod imp {
             // Rules Signals
             let this_weak = this.downgrade();
             self.add_rule_btn.connect_clicked(move |_| {
-               if let Some(this) = this_weak.upgrade() {
-                   this.show_add_rule_dialog(); 
-               }
+                if let Some(this) = this_weak.upgrade() {
+                    this.show_add_rule_dialog();
+                }
             });
             let this_muted = this.clone();
             self.muted_switch_row.connect_active_notify({
@@ -152,15 +155,16 @@ mod imp {
             // Encryption Signal
             let debouncer_clone = debouncer.clone();
             let this_weak = this.downgrade();
-            self.encryption_key_entry.connect_notify_local(Some("text"), move |entry, _| {
-                if let Some(this) = this_weak.upgrade() {
-                     let entry = entry.clone();
-                     let debouncer = debouncer_clone.clone();
-                     debouncer.call(std::time::Duration::from_millis(500), move || {
-                         this.update_encryption_key(&entry);
-                     });
-                }
-            });
+            self.encryption_key_entry
+                .connect_notify_local(Some("text"), move |entry, _| {
+                    if let Some(this) = this_weak.upgrade() {
+                        let entry = entry.clone();
+                        let debouncer = debouncer_clone.clone();
+                        debouncer.call(std::time::Duration::from_millis(500), move || {
+                            this.update_encryption_key(&entry);
+                        });
+                    }
+                });
         }
     }
     impl WidgetImpl for SubscriptionInfoDialog {}
@@ -208,19 +212,19 @@ impl SubscriptionInfoDialog {
             imp.schedule_enabled_switch.set_active(true);
             imp.schedule_start_entry.set_text(&schedule.start_time);
             imp.schedule_end_entry.set_text(&schedule.end_time);
-            
+
             let mut i = imp.schedule_days_box.first_child();
             let mut ui_idx = 0;
             while let Some(child) = i {
                 if let Some(btn) = child.downcast_ref::<gtk::ToggleButton>() {
-                     let model_day = Self::ui_idx_to_model_day(ui_idx);
-                     btn.set_active(schedule.days.contains(&model_day));
-                     ui_idx += 1;
+                    let model_day = Self::ui_idx_to_model_day(ui_idx);
+                    btn.set_active(schedule.days.contains(&model_day));
+                    ui_idx += 1;
                 }
                 i = child.next_sibling();
             }
         } else {
-             imp.schedule_enabled_switch.set_active(false);
+            imp.schedule_enabled_switch.set_active(false);
         }
     }
 
@@ -230,24 +234,23 @@ impl SubscriptionInfoDialog {
         let sub = self.subscription().unwrap();
 
         if !enabled {
-            self.error_boundary().spawn(async move {
-                sub.set_schedule(None).await
-            });
+            self.error_boundary()
+                .spawn(async move { sub.set_schedule(None).await });
             return;
         }
 
         let start = imp.schedule_start_entry.text();
         let end = imp.schedule_end_entry.text();
-        
+
         let mut days = vec![];
         let mut i = imp.schedule_days_box.first_child();
         let mut ui_idx = 0;
         while let Some(child) = i {
             if let Some(btn) = child.downcast_ref::<gtk::ToggleButton>() {
-                    if btn.is_active() {
-                        days.push(Self::ui_idx_to_model_day(ui_idx));
-                    }
-                    ui_idx += 1;
+                if btn.is_active() {
+                    days.push(Self::ui_idx_to_model_day(ui_idx));
+                }
+                ui_idx += 1;
             }
             i = child.next_sibling();
         }
@@ -258,9 +261,8 @@ impl SubscriptionInfoDialog {
             days,
         };
 
-        self.error_boundary().spawn(async move {
-            sub.set_schedule(Some(schedule)).await
-        });
+        self.error_boundary()
+            .spawn(async move { sub.set_schedule(Some(schedule)).await });
     }
 
     fn init_rules_ui(&self, sub: &crate::subscription::Subscription) {
@@ -273,9 +275,9 @@ impl SubscriptionInfoDialog {
         }
 
         if let Some(rules) = sub.get_rules() {
-             for rule in rules {
-                 self.add_rule_row(&rule);
-             }
+            for rule in rules {
+                self.add_rule_row(&rule);
+            }
         }
     }
 
@@ -307,62 +309,62 @@ impl SubscriptionInfoDialog {
             .title(&rule.name)
             .subtitle(subtitle)
             .build();
-        
+
         // Add delete button
         let btn = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
             .valign(gtk::Align::Center)
             .css_classes(vec!["flat"])
             .build();
-        
+
         let rule_clone = rule.clone();
         let this_weak = self.downgrade();
         btn.connect_clicked(move |_| {
-             if let Some(this) = this_weak.upgrade() {
+            if let Some(this) = this_weak.upgrade() {
                 this.delete_rule(&rule_clone);
-             }
+            }
         });
 
         row.add_suffix(&btn);
         imp.rules_list.append(&row);
     }
-    
+
     fn delete_rule(&self, rule_to_delete: &ntfy_daemon::models::FilterRule) {
-         let sub = self.subscription().unwrap();
-         if let Some(mut rules) = sub.get_rules() {
-             rules.retain(|r| r.regex != rule_to_delete.regex || r.name != rule_to_delete.name);
-             let this = self.clone();
-             let sub_clone = sub.clone();
-             self.error_boundary().spawn(async move {
-                 let _ = sub_clone.set_rules(Some(rules)).await;
-                 this.init_rules_ui(&sub_clone);
-                 Ok::<(), anyhow::Error>(())
-             });
-         }
+        let sub = self.subscription().unwrap();
+        if let Some(mut rules) = sub.get_rules() {
+            rules.retain(|r| r.regex != rule_to_delete.regex || r.name != rule_to_delete.name);
+            let this = self.clone();
+            let sub_clone = sub.clone();
+            self.error_boundary().spawn(async move {
+                let _ = sub_clone.set_rules(Some(rules)).await;
+                this.init_rules_ui(&sub_clone);
+                Ok::<(), anyhow::Error>(())
+            });
+        }
     }
 
     fn show_add_rule_dialog(&self) {
         let dialog = crate::widgets::filter_rule_dialog::FilterRuleDialog::new();
         let this_weak = self.downgrade();
-        
+
         dialog.connect_closed(move |d| {
             if let Some(this) = this_weak.upgrade() {
                 if let Some(rule) = d.get_rule() {
-                     let sub = this.subscription().unwrap();
-                     let mut rules = sub.get_rules().unwrap_or_default();
-                     rules.push(rule);
-                     
-                     let sub_clone = sub.clone();
-                     let this_clone = this.clone();
-                     this.error_boundary().spawn(async move {
-                         let _ = sub_clone.set_rules(Some(rules)).await;
-                         this_clone.init_rules_ui(&sub_clone);
-                         Ok::<(), anyhow::Error>(())
-                     });
+                    let sub = this.subscription().unwrap();
+                    let mut rules = sub.get_rules().unwrap_or_default();
+                    rules.push(rule);
+
+                    let sub_clone = sub.clone();
+                    let this_clone = this.clone();
+                    this.error_boundary().spawn(async move {
+                        let _ = sub_clone.set_rules(Some(rules)).await;
+                        this_clone.init_rules_ui(&sub_clone);
+                        Ok::<(), anyhow::Error>(())
+                    });
                 }
             }
         });
-        
+
         dialog.present(Some(self));
     }
 
@@ -371,12 +373,17 @@ impl SubscriptionInfoDialog {
         let sub = sub.clone();
         let this_inner = this.clone();
         this.error_boundary().spawn(async move {
-            if let Some(window) = this_inner.root().and_downcast::<crate::widgets::NtfyrWindow>() {
-                 let notifier = window.notifier();
-                 let key = notifier.get_key(sub.server().as_str(), sub.topic().as_str()).await?;
-                 if let Some(key) = key {
-                     this_inner.imp().encryption_key_entry.set_text(&key);
-                 }
+            if let Some(window) = this_inner
+                .root()
+                .and_downcast::<crate::widgets::NtfyrWindow>()
+            {
+                let notifier = window.notifier();
+                let key = notifier
+                    .get_key(sub.server().as_str(), sub.topic().as_str())
+                    .await?;
+                if let Some(key) = key {
+                    this_inner.imp().encryption_key_entry.set_text(&key);
+                }
             }
             Ok(())
         });
@@ -386,19 +393,23 @@ impl SubscriptionInfoDialog {
         if let Some(sub) = self.subscription() {
             let key = entry.text().to_string();
             let sub = sub.clone();
-            
+
             // We need to access the application to get the notifier handle
             // Or add a method to Subscription wrapper to set key
             if let Some(window) = self.root().and_downcast::<crate::widgets::NtfyrWindow>() {
-                 window.error_boundary().spawn(async move {
-                     let notifier = window.notifier();
-                     if key.is_empty() {
-                         notifier.remove_key(sub.server().as_str(), sub.topic().as_str()).await?;
-                     } else {
-                         notifier.add_key(sub.server().as_str(), sub.topic().as_str(), &key).await?;
-                     }
-                     Ok(())
-                 });
+                window.error_boundary().spawn(async move {
+                    let notifier = window.notifier();
+                    if key.is_empty() {
+                        notifier
+                            .remove_key(sub.server().as_str(), sub.topic().as_str())
+                            .await?;
+                    } else {
+                        notifier
+                            .add_key(sub.server().as_str(), sub.topic().as_str(), &key)
+                            .await?;
+                    }
+                    Ok(())
+                });
             }
         }
     }

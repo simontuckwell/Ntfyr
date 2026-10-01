@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use crate::credentials::{KeyringItem, LightKeyring, NullableKeyring, build_keyring};
+use crate::credentials::{build_keyring, KeyringItem, LightKeyring, NullableKeyring};
 
 #[derive(Clone)]
 pub struct Keys {
@@ -21,11 +21,11 @@ impl Keys {
         Ok(this)
     }
 
-    pub fn new_nullable(mock_keys: HashMap<(String, String), String>) -> anyhow::Result<Self> {        
+    pub fn new_nullable(mock_keys: HashMap<(String, String), String>) -> anyhow::Result<Self> {
         // Convert map to keyring items format for the mock
         let mut search_response = vec![];
         for ((server, topic), key) in &mock_keys {
-             let attributes = HashMap::from([
+            let attributes = HashMap::from([
                 ("type".to_string(), "topic_key".to_string()),
                 ("server".to_string(), server.clone()),
                 ("topic".to_string(), topic.clone()),
@@ -52,52 +52,48 @@ impl Keys {
         let mut lock = self.keys.write().unwrap();
         lock.clear();
         for item in values {
-        let attrs: HashMap<String, String> = item.attributes().await;
-        if let (Some(server), Some(topic)) = (attrs.get("server"), attrs.get("topic")) {
-             lock.insert(
-                (server.clone(), topic.clone()),
-                std::str::from_utf8(item.secret().await)?.to_string(),
-            );
-        }
+            let attrs: HashMap<String, String> = item.attributes().await;
+            if let (Some(server), Some(topic)) = (attrs.get("server"), attrs.get("topic")) {
+                lock.insert(
+                    (server.clone(), topic.clone()),
+                    std::str::from_utf8(item.secret().await)?.to_string(),
+                );
+            }
         }
         Ok(())
     }
 
     pub fn get(&self, server: &str, topic: &str) -> Option<String> {
-        self.keys.read().unwrap().get(&(server.to_string(), topic.to_string())).cloned()
+        self.keys
+            .read()
+            .unwrap()
+            .get(&(server.to_string(), topic.to_string()))
+            .cloned()
     }
 
     pub async fn insert(&self, server: &str, topic: &str, key: &str) -> anyhow::Result<()> {
-        let attrs = HashMap::from([
-            ("type", "topic_key"),
-            ("server", server),
-            ("topic", topic),
-        ]);
-        
+        let attrs = HashMap::from([("type", "topic_key"), ("server", server), ("topic", topic)]);
+
         self.keyring
             .create_item("Ntfyr Topic Key", attrs, key, true)
             .await?;
 
-        self.keys.write().unwrap().insert(
-            (server.to_string(), topic.to_string()),
-            key.to_string(),
-        );
+        self.keys
+            .write()
+            .unwrap()
+            .insert((server.to_string(), topic.to_string()), key.to_string());
         Ok(())
     }
 
     pub async fn delete(&self, server: &str, topic: &str) -> anyhow::Result<()> {
-        let attrs = HashMap::from([
-            ("type", "topic_key"),
-            ("server", server),
-            ("topic", topic),
-        ]);
+        let attrs = HashMap::from([("type", "topic_key"), ("server", server), ("topic", topic)]);
         self.keyring.delete(attrs).await?;
-        
+
         self.keys
             .write()
             .unwrap()
             .remove(&(server.to_string(), topic.to_string()));
-            
+
         Ok(())
     }
 }

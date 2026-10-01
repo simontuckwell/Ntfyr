@@ -20,7 +20,6 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose, Engine as _};
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "event")]
 pub enum ServerEvent {
@@ -110,8 +109,9 @@ async fn response_lines(
     // until the daemon runs out of memory. Overflow surfaces as an io error,
     // which drops to the existing retry/backoff path.
     const MAX_LINE_BYTES: usize = 1 << 20; // 1 MiB
-    let lines = FramedRead::new(res, LinesCodec::new_with_max_length(MAX_LINE_BYTES))
-        .map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string())));
+    let lines = FramedRead::new(res, LinesCodec::new_with_max_length(MAX_LINE_BYTES)).map(|r| {
+        r.map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
+    });
     Ok(lines)
 }
 
@@ -280,7 +280,9 @@ impl ListenerActor {
                     | ServerEvent::MessageDelete { sequence_id } => {
                         debug!(seq_id = %sequence_id, "received clear/delete event");
                         self.event_tx
-                            .send(ListenerEvent::MessageRemoved { seq_id: sequence_id })
+                            .send(ListenerEvent::MessageRemoved {
+                                seq_id: sequence_id,
+                            })
                             .await
                             .unwrap();
                     }
@@ -294,7 +296,11 @@ impl ListenerActor {
     }
 
     fn try_decrypt(&self, msg: &mut models::ReceivedMessage) {
-        let Some(key) = self.config.keys.get(&self.config.endpoint, &self.config.topic) else {
+        let Some(key) = self
+            .config
+            .keys
+            .get(&self.config.endpoint, &self.config.topic)
+        else {
             return;
         };
         let Some(ciphertext) = &msg.message else {
@@ -308,28 +314,31 @@ impl ListenerActor {
             return;
         };
         if key_bytes.len() != 32 {
-             error!("Invalid key length for topic {} (expected 32 bytes)", self.config.topic);
-             return;
+            error!(
+                "Invalid key length for topic {} (expected 32 bytes)",
+                self.config.topic
+            );
+            return;
         }
 
-        // Ciphertext format: 
+        // Ciphertext format:
         // ntfy uses AES-GCM. The raw message is base64 encoded.
         // It consists of version (1 byte) + nonce (12 bytes) + ciphertext.
         // But ntfy docs say: "The message is encrypted using AES-256-GCM. The encryption key is derived from the password using PBKDF2... Wait."
-        // Let's re-read ntfy docs on encryption. 
+        // Let's re-read ntfy docs on encryption.
         // "End-to-end encryption ... You can generate a key ... The key is a 32-byte random string."
         // "Messages are encrypted using AES-GCM (256 bit). The nonce (IV) is 12 bytes long."
         // "The encrypted message is constructed as follows: <1 byte version> <12 bytes nonce> <ciphertext>"
         // Version is currently 1.
-        
+
         let Ok(raw) = general_purpose::STANDARD.decode(ciphertext) else {
-             // Not base64, maybe not encrypted or just garbage? 
-             // If we have a key, we expect it to be encrypted.
-             return; 
+            // Not base64, maybe not encrypted or just garbage?
+            // If we have a key, we expect it to be encrypted.
+            return;
         };
 
         if raw.len() < 1 + 12 {
-            return; 
+            return;
         }
 
         let version = raw[0];
@@ -346,8 +355,8 @@ impl ListenerActor {
         match cipher.decrypt(nonce, ciphertext_body) {
             Ok(plaintext) => {
                 if let Ok(utf8) = String::from_utf8(plaintext) {
-                     debug!("Decrypted message for topic {}", self.config.topic);
-                     msg.message = Some(utf8);
+                    debug!("Decrypted message for topic {}", self.config.topic);
+                    msg.message = Some(utf8);
                 }
             }
             Err(_) => {
@@ -421,7 +430,8 @@ mod parse_tests {
             other => panic!("expected Message, got {other:?}"),
         }
 
-        let clear = r#"{"id":"x","sequence_id":"orig","time":2,"event":"message_clear","topic":"t"}"#;
+        let clear =
+            r#"{"id":"x","sequence_id":"orig","time":2,"event":"message_clear","topic":"t"}"#;
         match serde_json::from_str::<ServerEvent>(clear).unwrap() {
             ServerEvent::MessageClear { sequence_id } => assert_eq!(sequence_id, "orig"),
             other => panic!("expected MessageClear, got {other:?}"),

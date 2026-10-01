@@ -28,7 +28,7 @@ impl Db {
     fn migrate(&mut self) -> Result<()> {
         let conn = self.conn.write().unwrap();
         let version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
-        
+
         if version < 1 {
             conn.execute_batch(include_str!("./migrations/00.sql"))?;
             conn.pragma_update(None, "user_version", 1)?;
@@ -152,7 +152,7 @@ impl Db {
         let rows = stmt.query_map(params![], |row| {
             let rules_str: Option<String> = row.get(9)?;
             let schedule_str: Option<String> = row.get(10)?;
-            
+
             Ok(models::Subscription {
                 server: row.get(0)?,
                 topic: row.get(1)?,
@@ -203,13 +203,14 @@ impl Db {
         let mut conn = self.conn.write().unwrap();
         let tx = conn.transaction().map_err(Error::Db)?;
         let server_id = Self::server_id_or_insert_tx(&tx, server).map_err(Error::Db)?;
-        let n = tx.execute(
-            "UPDATE subscription
+        let n = tx
+            .execute(
+                "UPDATE subscription
             SET read_until = ?3, listen_since = ?3
             WHERE server = ?1 AND topic = ?2",
-            params![server_id, topic, bump as i64],
-        )
-        .map_err(Error::Db)?;
+                params![server_id, topic, bump as i64],
+            )
+            .map_err(Error::Db)?;
         if n == 0 {
             tx.rollback().ok();
             return Err(Error::SubscriptionNotFound(
@@ -290,7 +291,12 @@ impl Db {
 
     /// Remove every message belonging to a notification sequence: the original
     /// (id == seq_key) and any updates (sequence_id == seq_key).
-    pub fn delete_by_seq_key(&mut self, server: &str, topic: &str, seq_key: &str) -> Result<(), Error> {
+    pub fn delete_by_seq_key(
+        &mut self,
+        server: &str,
+        topic: &str,
+        seq_key: &str,
+    ) -> Result<(), Error> {
         let server_id = self.get_or_insert_server(server).unwrap();
         let conn = self.conn.read().unwrap();
         conn.execute(
@@ -315,11 +321,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn get_last_message_time(
-        &self,
-        server: &str,
-        topic: &str,
-    ) -> Result<Option<u64>, Error> {
+    pub fn get_last_message_time(&self, server: &str, topic: &str) -> Result<Option<u64>, Error> {
         let conn = self.conn.read().unwrap();
         let mut stmt = conn.prepare(
             "SELECT MAX(m.data ->> 'time')
@@ -396,9 +398,13 @@ mod tests {
         db.insert_subscription(sub.clone()).unwrap();
 
         // Original notification, then an update referencing it via sequence_id.
-        db.insert_message(&sub.server, &sample_message_json("alerts", "orig", 1_700_000_010))
+        db.insert_message(
+            &sub.server,
+            &sample_message_json("alerts", "orig", 1_700_000_010),
+        )
+        .unwrap();
+        db.delete_by_seq_key(&sub.server, &sub.topic, "orig")
             .unwrap();
-        db.delete_by_seq_key(&sub.server, &sub.topic, "orig").unwrap();
         db.insert_message(
             &sub.server,
             &update_message_json("alerts", "upd", "orig", 1_700_000_020),
@@ -411,8 +417,12 @@ mod tests {
         assert!(stored[0].contains("\"id\":\"upd\""));
 
         // A clear/delete for the sequence removes the update too (matches by sequence_id).
-        db.delete_by_seq_key(&sub.server, &sub.topic, "orig").unwrap();
-        assert!(db.list_messages(&sub.server, &sub.topic, 0).unwrap().is_empty());
+        db.delete_by_seq_key(&sub.server, &sub.topic, "orig")
+            .unwrap();
+        assert!(db
+            .list_messages(&sub.server, &sub.topic, 0)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

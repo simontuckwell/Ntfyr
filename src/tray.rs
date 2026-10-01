@@ -1,9 +1,12 @@
+use gtk::prelude::*;
+use gtk::{gio, glib};
 use ksni;
 use ksni::TrayMethods;
 use std::error::Error;
-use gtk::prelude::*;
-use gtk::{gio, glib};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use gettextrs::gettext;
 
@@ -57,9 +60,9 @@ impl ksni::Tray for NtfyrTray {
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::*;
         let label = if self.visible.load(Ordering::Relaxed) {
-             gettext("Hide Window")
+            gettext("Hide Window")
         } else {
-             gettext("Show Window")
+            gettext("Show Window")
         };
         vec![
             StandardItem {
@@ -75,8 +78,8 @@ impl ksni::Tray for NtfyrTray {
                                         window.present();
                                     }
                                 } else {
-                                     // Fallback to action if no window found
-                                     app.activate_action("toggle-window", None);
+                                    // Fallback to action if no window found
+                                    app.activate_action("toggle-window", None);
                                 }
                             }
                         }
@@ -88,11 +91,11 @@ impl ksni::Tray for NtfyrTray {
             StandardItem {
                 label: gettext("Quit").into(),
                 activate: Box::new(|_| {
-                     glib::MainContext::default().invoke(move || {
+                    glib::MainContext::default().invoke(move || {
                         if let Some(app) = gio::Application::default() {
                             app.activate_action("quit", None);
                         }
-                     });
+                    });
                 }),
                 ..Default::default()
             }
@@ -101,8 +104,14 @@ impl ksni::Tray for NtfyrTray {
     }
 }
 
-pub fn spawn_tray(visible: Arc<AtomicBool>, has_unread: Arc<AtomicBool>) -> Result<ksni::Handle<NtfyrTray>, Box<dyn Error>> {
-    let tray = NtfyrTray { visible, has_unread };
+pub fn spawn_tray(
+    visible: Arc<AtomicBool>,
+    has_unread: Arc<AtomicBool>,
+) -> Result<ksni::Handle<NtfyrTray>, Box<dyn Error>> {
+    let tray = NtfyrTray {
+        visible,
+        has_unread,
+    };
     // Create a new runtime specifically for the tray event loop if strictly needed,
     // but ksni might blocking run on prompt.
     // Karere used `rt.block_on(tray.spawn())`.

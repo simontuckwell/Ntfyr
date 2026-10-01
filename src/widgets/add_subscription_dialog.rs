@@ -64,8 +64,7 @@ impl AddSubscriptionDialog {
         let imp = self.imp();
         let obj = self.clone();
         let server_url = imp.server_url.get().unwrap();
-        let subscribing_label =
-            gettext("Subscribing to topic on {}").replacen("{}", server_url, 1);
+        let subscribing_label = gettext("Subscribing to topic on {}").replacen("{}", server_url, 1);
 
         obj.set_title(&gettext("Subscribe To Topic"));
 
@@ -137,7 +136,7 @@ impl AddSubscriptionDialog {
 
         // Initial check
         debounced_error_check();
-        
+
         // Mock server widget for struct compatibility, using RefCell
         // Since we removed them from UI, we still need them in struct if we keep struct same?
         // Wait, I can update the struct definition in replacement content too!
@@ -145,12 +144,12 @@ impl AddSubscriptionDialog {
         // The targeted range (EndLine: 278) covers 'imp' module end but NOT 'Widgets' struct definition at line 12.
         // So I must update Widgets struct separately or accept unused fields if I just change the build_ui logic.
         // Actually, let's redefine Widgets in imp logic or update it first.
-        
+
         // For now, I will populate the struct with dummy widgets or just remove them from struct in a separate call?
-        // Let's update `Widgets` struct first or here? 
+        // Let's update `Widgets` struct first or here?
         // I cannot easily update line 12-18 and 22-278 in one go if I don't replace whole file.
         // Let's replace the whole file content for safety and correctness.
-        
+
         imp.widgets.replace(Widgets {
             topic_entry,
             sub_btn,
@@ -159,16 +158,16 @@ impl AddSubscriptionDialog {
         obj.set_content_width(400);
         obj.set_child(Some(&toolbar_view));
     }
-    
+
     pub fn subscription(&self) -> Result<models::Subscription, ntfy_daemon::Error> {
         let w = { self.imp().widgets.borrow().clone() };
         let server = self.imp().server_url.get().unwrap();
-        
+
         models::Subscription::builder(w.topic_entry.text().to_string())
             .server(server.clone())
             .build()
     }
-    
+
     fn check_errors(&self) {
         let w = { self.imp().widgets.borrow().clone() };
         let sub = self.subscription();
@@ -180,7 +179,7 @@ impl AddSubscriptionDialog {
             w.sub_btn.set_sensitive(false);
             for e in errs {
                 if let ntfy_daemon::Error::InvalidTopic(_) = e {
-                     w.topic_entry.add_css_class("error");
+                    w.topic_entry.add_css_class("error");
                 }
             }
         }

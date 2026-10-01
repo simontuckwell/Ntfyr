@@ -261,14 +261,14 @@ impl NtfyActor {
 
             NtfyCommand::ListKeys { resp_tx } => {
                 let _keys = self.env.keys.clone();
-                // Not optimal but we need to read from the internal lock which is not exposed directly 
+                // Not optimal but we need to read from the internal lock which is not exposed directly
                 // We'll rely on the keys internal cache which we can't easily access from here without exposing it.
                 // Or we can just read from the struct if we make `keys` map public or add a method.
                 // Let's assume we don't need ListKeys for now or we implement `list_all` in `keys.rs`.
                 // Wait, I didn't implement `list_all` in `keys.rs`. Let's skip ListKeys implementation in keys.rs for now or add it.
-                
+
                 // Correction: I should have added `list_all` to `keys.rs`.
-                // Since I cannot edit `keys.rs` in this same tool call, I will assume I can just access it via a new method later 
+                // Since I cannot edit `keys.rs` in this same tool call, I will assume I can just access it via a new method later
                 // OR I can't fulfill this command yet.
                 // Actually, I can just not implement ListKeys command if the UI doesn't need it (it acts per subscription).
                 // Or I can add `list_all` to `keys.rs` in a subsequent step.
@@ -318,7 +318,8 @@ impl NtfyActor {
             .unwrap_or(None)
             .unwrap_or(0);
 
-        let since = crate::message_repo::compute_listen_since(db_max_message_time, sub.listen_since);
+        let since =
+            crate::message_repo::compute_listen_since(db_max_message_time, sub.listen_since);
 
         let listener = ListenerHandle::new(ListenerConfig {
             http_client: self.env.http_client.clone(),
@@ -411,7 +412,7 @@ impl NtfyHandle {
     }
 
     pub async fn add_key(&self, server: &str, topic: &str, key: &str) -> anyhow::Result<()> {
-         send_command!(self, |resp_tx| NtfyCommand::AddKey {
+        send_command!(self, |resp_tx| NtfyCommand::AddKey {
             server: server.to_string(),
             topic: topic.to_string(),
             key: key.to_string(),
@@ -613,10 +614,7 @@ mod tests {
                 .error_for_status()
                 .expect("second publish status");
 
-            let subscription_handle = handle
-                .subscribe(server, &topic)
-                .await
-                .expect("subscribe");
+            let subscription_handle = handle.subscribe(server, &topic).await.expect("subscribe");
 
             sleep(Duration::from_secs(3)).await;
 

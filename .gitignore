@@ -14,3 +14,8 @@
 /subprojects/blueprint-compiler
 .flatpak-builder/
 *.po~
+.fusion
+.pi
+fusion.db
+fusion.db-wal
+fusion.db-shm

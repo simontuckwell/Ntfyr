@@ -11,6 +11,7 @@ use tokio::{
 use tracing::{error, info};
 
 use crate::{
+    credentials::Credential,
     http_client::HttpClient,
     message_repo::Db,
     models::{self, Account},
@@ -56,8 +57,7 @@ pub enum NtfyCommand {
     },
     AddAccount {
         server: String,
-        username: String,
-        password: String,
+        credential: Credential,
         resp_tx: oneshot::Sender<anyhow::Result<()>>,
     },
     RemoveAccount {
@@ -209,8 +209,9 @@ impl NtfyActor {
                     .list_all()
                     .into_iter()
                     .map(|(server, credential)| Account {
+                        username: credential.username().map(str::to_string),
+                        auth_kind: (&credential).into(),
                         server,
-                        username: credential.username,
                     })
                     .collect();
                 let _ = resp_tx.send(Ok(accounts));
@@ -223,15 +224,10 @@ impl NtfyActor {
 
             NtfyCommand::AddAccount {
                 server,
-                username,
-                password,
+                credential,
                 resp_tx,
             } => {
-                let result = self
-                    .env
-                    .credentials
-                    .insert(&server, &username, &password)
-                    .await;
+                let result = self.env.credentials.insert(&server, credential).await;
                 let _ = resp_tx.send(result);
             }
 
@@ -390,16 +386,10 @@ impl NtfyHandle {
         send_command!(self, |resp_tx| NtfyCommand::WatchSubscribed { resp_tx })
     }
 
-    pub async fn add_account(
-        &self,
-        server: &str,
-        username: &str,
-        password: &str,
-    ) -> anyhow::Result<()> {
+    pub async fn add_account(&self, server: &str, credential: Credential) -> anyhow::Result<()> {
         send_command!(self, |resp_tx| NtfyCommand::AddAccount {
             server: server.to_string(),
-            username: username.to_string(),
-            password: password.to_string(),
+            credential,
             resp_tx,
         })
     }

@@ -442,10 +442,29 @@ impl From<Status> for u8 {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AuthKind {
+    /// Username/password (HTTP Basic) authentication.
+    #[default]
+    Basic,
+    /// Access token (HTTP Bearer) authentication.
+    Bearer,
+}
+
+impl From<&crate::credentials::Credential> for AuthKind {
+    fn from(value: &crate::credentials::Credential) -> Self {
+        match value {
+            crate::credentials::Credential::Basic { .. } => AuthKind::Basic,
+            crate::credentials::Credential::Bearer { .. } => AuthKind::Bearer,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Account {
     pub server: String,
-    pub username: String,
+    pub username: Option<String>,
+    pub auth_kind: AuthKind,
 }
 
 pub struct Notification {

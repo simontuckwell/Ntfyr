@@ -1234,11 +1234,11 @@ impl NtfyrWindow {
             "save",
             false,
             glib::closure_local!(move |dialog: NtfyrAccountDialog| {
-                let (server, username, password) = dialog.account_data();
+                let (server, credential) = dialog.account_data();
                 let this = this.clone();
                 this.error_boundary().spawn(async move {
                     let n = this.notifier();
-                    n.add_account(&server, &username, &password).await?;
+                    n.add_account(&server, credential).await?;
                     let toast = adw::Toast::new(&gettext("Account added successfully"));
                     this.imp().toast_overlay.add_toast(toast);
                     Ok(())

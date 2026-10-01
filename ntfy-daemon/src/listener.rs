@@ -10,7 +10,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, warn, Instrument};
 
-use crate::credentials::Credentials;
+use crate::credentials::{Credential, Credentials};
 use crate::http_client::HttpClient;
 use crate::{models, Error};
 
@@ -85,16 +85,15 @@ fn topic_request(
     endpoint: &str,
     topic: &str,
     since: u64,
-    username: Option<&str>,
-    password: Option<&str>,
+    credential: Option<&Credential>,
 ) -> anyhow::Result<reqwest::Request> {
     let url = models::Subscription::build_url(endpoint, topic, since)?;
     let mut req = client
         .get(url.as_str())
         .header("Content-Type", "application/x-ndjson")
         .header("Transfer-Encoding", "chunked");
-    if let Some(username) = username {
-        req = req.basic_auth(username, password);
+    if let Some(credential) = credential {
+        req = credential.authenticate(req);
     }
 
     Ok(req.build()?)
@@ -233,8 +232,7 @@ impl ListenerActor {
                 &self.config.endpoint,
                 &self.config.topic,
                 self.config.since,
-                creds.as_ref().map(|x| x.username.as_str()),
-                creds.as_ref().map(|x| x.password.as_str()),
+                creds.as_ref(),
             );
 
             debug!("executing request");
@@ -347,12 +345,12 @@ impl ListenerActor {
             return;
         }
 
-        let nonce = Nonce::from_slice(&raw[1..13]);
+        let nonce = Nonce::try_from(&raw[1..13]).expect("12-byte nonce");
         let ciphertext_body = &raw[13..];
 
         let cipher = Aes256Gcm::new_from_slice(&key_bytes).expect("Key size verified");
 
-        match cipher.decrypt(nonce, ciphertext_body) {
+        match cipher.decrypt(&nonce, ciphertext_body) {
             Ok(plaintext) => {
                 if let Ok(utf8) = String::from_utf8(plaintext) {
                     debug!("Decrypted message for topic {}", self.config.topic);

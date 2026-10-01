@@ -33,6 +33,17 @@ template $NtfyrAccountDialog: Adw.Dialog {
           "boxed-list",
         ]
 
+        Adw.ComboRow auth_mode_row {
+          title: _("Authentication");
+
+          model: Gtk.StringList {
+            strings [
+              _("Username and password"),
+              _("Access token")
+            ]
+          };
+        }
+
         Adw.EntryRow username_entry {
           title: _("Username");
           activates-default: true;
@@ -40,6 +51,12 @@ template $NtfyrAccountDialog: Adw.Dialog {
 
         Adw.PasswordEntryRow password_entry {
           title: _("Password");
+          activates-default: true;
+        }
+
+        Adw.PasswordEntryRow token_entry {
+          title: _("Token");
+          visible: false;
           activates-default: true;
         }
       }

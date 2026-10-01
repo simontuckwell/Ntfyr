@@ -378,7 +378,7 @@ impl SubscriptionActor {
             {
                 use aes_gcm::{
                     aead::{Aead, KeyInit},
-                    Aes256Gcm, Key, Nonce,
+                    Aes256Gcm, Nonce,
                 };
                 use base64::{engine::general_purpose, Engine as _};
                 let key_bytes = general_purpose::STANDARD
@@ -390,16 +390,16 @@ impl SubscriptionActor {
                         key_bytes.len()
                     ));
                 }
-                let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-                let cipher = Aes256Gcm::new(key);
+                let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+                    .map_err(|e| anyhow::anyhow!("Invalid key: {}", e))?;
 
                 let mut nonce_bytes = [0u8; 12];
                 rand::fill(&mut nonce_bytes);
-                let nonce = Nonce::from_slice(&nonce_bytes);
+                let nonce = Nonce::try_from(&nonce_bytes[..]).expect("12-byte nonce");
 
                 let plaintext = msg.message.as_deref().unwrap_or("").as_bytes();
                 let ciphertext = cipher
-                    .encrypt(nonce, plaintext)
+                    .encrypt(&nonce, plaintext)
                     .map_err(|e| anyhow::anyhow!("Encryption failed: {}", e))?;
 
                 // Format: version(1) + nonce(12) + ciphertext
@@ -420,7 +420,7 @@ impl SubscriptionActor {
         let creds = self.env.credentials.get(server);
         let mut req = self.env.http_client.post(server);
         if let Some(creds) = creds {
-            req = req.basic_auth(creds.username, Some(creds.password));
+            req = creds.authenticate(req);
         }
 
         let body = serde_json::to_string(&msg)?;

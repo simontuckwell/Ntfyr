@@ -200,19 +200,28 @@ impl LightKeyring for NullableKeyring {
     }
 }
 impl NullableKeyring {
-    pub fn with_credentials(credentials: Vec<Credential>) -> Self {
+    pub fn with_credentials(credentials: Vec<(String, Credential)>) -> Self {
         let mut search_response = vec![];
 
-        for cred in credentials {
-            let attributes = HashMap::from([
-                ("type".to_string(), "password".to_string()),
-                ("username".to_string(), cred.username.clone()),
-                ("server".to_string(), cred.password.clone()),
-            ]);
-            search_response.push(KeyringItem {
-                attributes,
-                secret: cred.password.into_bytes(),
-            });
+        for (server, credential) in credentials {
+            let (attributes, secret) = match &credential {
+                Credential::Basic { username, password } => (
+                    HashMap::from([
+                        ("type".to_string(), BASIC_AUTH_TYPE.to_string()),
+                        ("username".to_string(), username.clone()),
+                        ("server".to_string(), server),
+                    ]),
+                    password.clone().into_bytes(),
+                ),
+                Credential::Bearer { token } => (
+                    HashMap::from([
+                        ("type".to_string(), TOKEN_AUTH_TYPE.to_string()),
+                        ("server".to_string(), server),
+                    ]),
+                    token.clone().into_bytes(),
+                ),
+            };
+            search_response.push(KeyringItem { attributes, secret });
         }
 
         Self { search_response }
@@ -257,10 +266,35 @@ pub async fn build_keyring(label: &str) -> Arc<dyn LightKeyring + Send + Sync> {
     ))
 }
 
-#[derive(Debug, Clone)]
-pub struct Credential {
-    pub username: String,
-    pub password: String,
+/// Keyring attribute value marking Basic-auth (username/password) items.
+pub const BASIC_AUTH_TYPE: &str = "password";
+/// Keyring attribute value marking Bearer-token items.
+pub const TOKEN_AUTH_TYPE: &str = "token";
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Credential {
+    /// Username/password authentication sent as HTTP Basic auth.
+    Basic { username: String, password: String },
+    /// Ntfy access token authentication sent as HTTP Bearer auth.
+    Bearer { token: String },
+}
+
+impl Credential {
+    /// Username identifying this account, if any. Token-based accounts have none.
+    pub fn username(&self) -> Option<&str> {
+        match self {
+            Credential::Basic { username, .. } => Some(username),
+            Credential::Bearer { .. } => None,
+        }
+    }
+
+    /// Apply these credentials as an Authorization header on a request.
+    pub fn authenticate(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match self {
+            Credential::Basic { username, password } => req.basic_auth(username, Some(password)),
+            Credential::Bearer { token } => req.bearer_auth(token),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -279,7 +313,7 @@ impl Credentials {
         this.load().await?;
         Ok(this)
     }
-    pub async fn new_nullable(credentials: Vec<Credential>) -> anyhow::Result<Self> {
+    pub async fn new_nullable(credentials: Vec<(String, Credential)>) -> anyhow::Result<Self> {
         let mut this = Self {
             keyring: Arc::new(NullableKeyring::with_credentials(credentials)),
             creds: Default::default(),
@@ -288,21 +322,52 @@ impl Credentials {
         Ok(this)
     }
     pub async fn load(&mut self) -> anyhow::Result<()> {
-        let attrs = HashMap::from([("type", "password")]);
-        let values = self.keyring.search_items(attrs).await?;
+        let mut loaded: HashMap<String, Credential> = HashMap::new();
 
-        let mut lock = self.creds.write().unwrap();
-        lock.clear();
+        // Basic-auth credentials (legacy and current schema).
+        let values = self
+            .keyring
+            .search_items(HashMap::from([("type", BASIC_AUTH_TYPE)]))
+            .await?;
         for item in values {
             let attrs = item.attributes().await;
-            lock.insert(
-                attrs["server"].to_string(),
-                Credential {
-                    username: attrs["username"].to_string(),
-                    password: std::str::from_utf8(&item.secret().await)?.to_string(),
+            if attrs.get("type").map(String::as_str) != Some(BASIC_AUTH_TYPE) {
+                continue;
+            }
+            let (Some(server), Some(username)) = (attrs.get("server"), attrs.get("username"))
+            else {
+                warn!("skipping keyring credential with missing server or username attribute");
+                continue;
+            };
+            let password = std::str::from_utf8(item.secret().await)?.to_string();
+            loaded.insert(
+                server.clone(),
+                Credential::Basic {
+                    username: username.clone(),
+                    password,
                 },
             );
         }
+
+        // Bearer-token credentials.
+        let values = self
+            .keyring
+            .search_items(HashMap::from([("type", TOKEN_AUTH_TYPE)]))
+            .await?;
+        for item in values {
+            let attrs = item.attributes().await;
+            if attrs.get("type").map(String::as_str) != Some(TOKEN_AUTH_TYPE) {
+                continue;
+            }
+            let Some(server) = attrs.get("server") else {
+                warn!("skipping token keyring credential with missing server attribute");
+                continue;
+            };
+            let token = std::str::from_utf8(item.secret().await)?.to_string();
+            loaded.insert(server.clone(), Credential::Bearer { token });
+        }
+
+        *self.creds.write().unwrap() = loaded;
         Ok(())
     }
     pub fn get(&self, server: &str) -> Option<Credential> {
@@ -311,34 +376,51 @@ impl Credentials {
     pub fn list_all(&self) -> HashMap<String, Credential> {
         self.creds.read().unwrap().clone()
     }
-    pub async fn insert(&self, server: &str, username: &str, password: &str) -> anyhow::Result<()> {
+    pub async fn insert(&self, server: &str, credential: Credential) -> anyhow::Result<()> {
         {
-            if let Some(cred) = self.creds.read().unwrap().get(server) {
-                if cred.username != username {
+            let creds = self.creds.read().unwrap();
+            if let Some(existing) = creds.get(server) {
+                // Only one account per server; replacing is allowed for the same account.
+                let same_account = match (&existing, &credential) {
+                    (
+                        Credential::Basic { username: u1, .. },
+                        Credential::Basic { username: u2, .. },
+                    ) => u1 == u2,
+                    (Credential::Bearer { .. }, Credential::Bearer { .. }) => true,
+                    _ => false,
+                };
+                if !same_account {
                     anyhow::bail!("You can add only one account per server");
                 }
             }
         }
-        let attrs = HashMap::from([
-            ("type", "password"),
-            ("username", username),
-            ("server", server),
-        ]);
-        self.keyring
-            .create_item("Password", attrs, password, true)
-            .await?;
+        match &credential {
+            Credential::Basic { username, password } => {
+                let attrs = HashMap::from([
+                    ("type", BASIC_AUTH_TYPE),
+                    ("username", username.as_str()),
+                    ("server", server),
+                ]);
+                self.keyring
+                    .create_item("Password", attrs, password, true)
+                    .await?;
+            }
+            Credential::Bearer { token } => {
+                let attrs = HashMap::from([("type", TOKEN_AUTH_TYPE), ("server", server)]);
+                self.keyring
+                    .create_item("Access token", attrs, token, true)
+                    .await?;
+            }
+        }
 
-        self.creds.write().unwrap().insert(
-            server.to_string(),
-            Credential {
-                username: username.to_string(),
-                password: password.to_string(),
-            },
-        );
+        self.creds
+            .write()
+            .unwrap()
+            .insert(server.to_string(), credential);
         Ok(())
     }
     pub async fn delete(&self, server: &str) -> anyhow::Result<()> {
-        let creds = {
+        let credential = {
             self.creds
                 .read()
                 .unwrap()
@@ -346,17 +428,140 @@ impl Credentials {
                 .ok_or(anyhow::anyhow!("server creds not found"))?
                 .clone()
         };
-        let attrs = HashMap::from([
-            ("type", "password"),
-            ("username", &creds.username),
-            ("server", server),
-        ]);
-        self.keyring.delete(attrs).await?;
+        match credential {
+            Credential::Basic { username, .. } => {
+                let attrs = HashMap::from([
+                    ("type", BASIC_AUTH_TYPE),
+                    ("username", username.as_str()),
+                    ("server", server),
+                ]);
+                self.keyring.delete(attrs).await?;
+            }
+            Credential::Bearer { .. } => {
+                let attrs = HashMap::from([("type", TOKEN_AUTH_TYPE), ("server", server)]);
+                self.keyring.delete(attrs).await?;
+            }
+        }
         self.creds
             .write()
             .unwrap()
             .remove(server)
             .ok_or(anyhow::anyhow!("server creds not found"))?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn roundtrips_basic_and_token_credentials() {
+        let creds = Credentials::new_nullable(vec![
+            (
+                "https://ntfy.sh".to_string(),
+                Credential::Basic {
+                    username: "user".to_string(),
+                    password: "secret".to_string(),
+                },
+            ),
+            (
+                "https://self.hosted".to_string(),
+                Credential::Bearer {
+                    token: "tk_secret".to_string(),
+                },
+            ),
+        ])
+        .await
+        .unwrap();
+
+        assert_eq!(
+            creds.get("https://ntfy.sh"),
+            Some(Credential::Basic {
+                username: "user".into(),
+                password: "secret".into(),
+            })
+        );
+        assert_eq!(
+            creds.get("https://self.hosted"),
+            Some(Credential::Bearer {
+                token: "tk_secret".into()
+            })
+        );
+        assert_eq!(creds.get("https://unknown"), None);
+    }
+
+    #[tokio::test]
+    async fn enforces_one_account_per_server() {
+        let creds = Credentials::new_nullable(vec![(
+            "https://x.test".to_string(),
+            Credential::Basic {
+                username: "alice".to_string(),
+                password: "pw".to_string(),
+            },
+        )])
+        .await
+        .unwrap();
+
+        // Replacing the same Basic account is allowed.
+        creds
+            .insert(
+                "https://x.test",
+                Credential::Basic {
+                    username: "alice".into(),
+                    password: "new-pw".into(),
+                },
+            )
+            .await
+            .unwrap();
+
+        // A different username on the same server is rejected.
+        let err = creds
+            .insert(
+                "https://x.test",
+                Credential::Basic {
+                    username: "bob".into(),
+                    password: "pw".into(),
+                },
+            )
+            .await;
+        assert!(err.is_err());
+
+        // Switching auth kind on the same server is rejected too.
+        let err = creds
+            .insert(
+                "https://x.test",
+                Credential::Bearer {
+                    token: "tk_x".into(),
+                },
+            )
+            .await;
+        assert!(err.is_err());
+
+        // A token account can be added for a different server and replaced.
+        creds
+            .insert(
+                "https://y.test",
+                Credential::Bearer {
+                    token: "tk_1".into(),
+                },
+            )
+            .await
+            .unwrap();
+        creds
+            .insert(
+                "https://y.test",
+                Credential::Bearer {
+                    token: "tk_2".into(),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            creds.get("https://y.test"),
+            Some(Credential::Bearer {
+                token: "tk_2".into()
+            })
+        );
     }
 }

@@ -3,8 +3,12 @@ use adw::subclass::prelude::*;
 use gettextrs::gettext;
 use glib::subclass::Signal;
 use gtk::{gio, glib};
-use ntfy_daemon::models::Account;
+use ntfy_daemon::credentials::Credential;
+use ntfy_daemon::models::{Account, AuthKind};
 use once_cell::sync::Lazy;
+
+const AUTH_MODE_BASIC: u32 = 0;
+const AUTH_MODE_TOKEN: u32 = 1;
 
 mod imp {
     use super::*;
@@ -13,9 +17,13 @@ mod imp {
     #[template(resource = "/io/github/tobagin/Ntfyr/ui/account_dialog.ui")]
     pub struct NtfyrAccountDialog {
         #[template_child]
+        pub auth_mode_row: TemplateChild<adw::ComboRow>,
+        #[template_child]
         pub username_entry: TemplateChild<adw::EntryRow>,
         #[template_child]
         pub password_entry: TemplateChild<adw::PasswordEntryRow>,
+        #[template_child]
+        pub token_entry: TemplateChild<adw::PasswordEntryRow>,
         #[template_child]
         pub save_btn: TemplateChild<gtk::Button>,
         pub server_url: once_cell::sync::OnceCell<String>,
@@ -67,23 +75,39 @@ impl NtfyrAccountDialog {
     pub fn new(server_url: String) -> Self {
         let obj: Self = glib::Object::builder().build();
         obj.imp().server_url.set(server_url).unwrap();
+
+        let this = obj.clone();
+        obj.imp()
+            .auth_mode_row
+            .connect_selected_notify(move |_| this.update_auth_rows_visibility());
+        obj.update_auth_rows_visibility();
+
         obj
+    }
+
+    fn update_auth_rows_visibility(&self) {
+        let imp = self.imp();
+        let token_mode = imp.auth_mode_row.selected() == AUTH_MODE_TOKEN;
+        imp.username_entry.set_visible(!token_mode);
+        imp.password_entry.set_visible(!token_mode);
+        imp.token_entry.set_visible(token_mode);
     }
 
     pub fn set_account(&self, account: &Account) {
         let imp = self.imp();
 
-        // Server context is already set via new() or we should verify matches?
-        // Ideally set_account is used when editing existing account.
-        // If we want to support editing, we might need to ensure server matches or update it?
-        // But for now, we assume dialog is opened for a specific server context.
-
-        imp.username_entry.set_text(&account.username);
+        imp.auth_mode_row.set_selected(match account.auth_kind {
+            AuthKind::Bearer => AUTH_MODE_TOKEN,
+            AuthKind::Basic => AUTH_MODE_BASIC,
+        });
+        if let Some(username) = &account.username {
+            imp.username_entry.set_text(username);
+        }
         imp.save_btn.set_label(&gettext("Save"));
         self.set_title(&gettext("Edit Account"));
     }
 
-    pub fn account_data(&self) -> (String, String, String) {
+    pub fn account_data(&self) -> (String, Credential) {
         let imp = self.imp();
 
         let server = imp
@@ -92,10 +116,17 @@ impl NtfyrAccountDialog {
             .map(|s| s.as_str())
             .unwrap_or("https://ntfy.sh");
 
-        (
-            server.into(),
-            imp.username_entry.text().to_string(),
-            imp.password_entry.text().to_string(),
-        )
+        let credential = if imp.auth_mode_row.selected() == AUTH_MODE_TOKEN {
+            Credential::Bearer {
+                token: imp.token_entry.text().to_string(),
+            }
+        } else {
+            Credential::Basic {
+                username: imp.username_entry.text().to_string(),
+                password: imp.password_entry.text().to_string(),
+            }
+        };
+
+        (server.into(), credential)
     }
 }

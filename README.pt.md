@@ -13,10 +13,11 @@ Cliente nativo de [ntfy.sh](https://ntfy.sh/) para o ambiente de trabalho GNOME.
 
 </div>
 
-## Última versão: 0.7.2
+## Última versão: 0.8.0
 
 Destaques recentes (histórico completo em [CHANGELOG.md](CHANGELOG.md)):
 
+- **0.8.0 — versão de funcionalidades** — inicie sessão num servidor com um token de acesso do ntfy em vez de utilizador e palavra-passe; as compilações Flatpak passam a usar o runtime GNOME 51.
 - **0.7.2 — correção de erros** — a caixa de entrada unificada agora respeita a ordenação decrescente.
 - **0.7.1 — correção de erros** — as notificações enviadas como Markdown passam a ser renderizadas (detetadas pelo tipo de conteúdo da mensagem).
 - **0.7.0 — versão de funcionalidades** — eliminar notificações individuais, filtrar por prioridade e etiquetas, e suporte às atualizações de notificações do ntfy (as notificações atualizadas substituem a original e são marcadas como «Editado»).
@@ -32,7 +33,7 @@ Instale a versão estável a partir do [Flathub](https://flathub.org/en/apps/io.
 ## Funcionalidades
 
 ### Núcleo
-- **Integração nativa** — GTK4 + Libadwaita, GNOME Platform 50.
+- **Integração nativa** — GTK4 + Libadwaita, GNOME Platform 51.
 - **Notificações push** — subscreva tópicos em `ntfy.sh` ou servidores auto-hospedados.
 - **Daemon em segundo plano** — backend in-process mantém ligações SSE e entrega notificações de secretária.
 - **Histórico local** — mensagens em SQLite para consulta offline e pesquisa.
@@ -62,7 +63,7 @@ Interface disponível em inglês, russo, alemão, espanhol, francês e portuguê
 
 ## Compilar a partir do código-fonte
 
-Requer Flatpak, `flatpak-builder` e SDK/runtime GNOME 50 (instalados automaticamente pelo script a partir do Flathub).
+Requer Flatpak, `flatpak-builder` e SDK/runtime GNOME 51 (instalados automaticamente pelo script a partir do Flathub).
 
 ```bash
 git clone https://github.com/tobagin/Ntfyr.git

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-01
+
+### ✨ Added
+
+- **Access token authentication**: Accounts can authenticate with an ntfy access token (HTTP Bearer) instead of a username and password. Pick the method in the account dialog; tokens are kept in the system keyring next to existing password credentials, and old password accounts keep working untouched.
+
+### 🔧 Changed
+
+- **GNOME 51 runtime**: Flatpak builds now target the `org.gnome.Platform`/`org.gnome.Sdk` 51 runtime.
+- **Dependencies**: Major bumps for `aes-gcm 0.10→0.11`, `base64 0.22→0.23`, `rusqlite 0.39→0.40`, `sha2 0.10→0.11`, `gettext-rs 0.7→0.8`, and `relm4-macros 0.10→0.11`, plus `cargo update` across the rest of the tree. Dropped reqwest's obsolete `rustls-native-certs` feature.
+
 ## [0.7.2] - 2026-08-10
 
 ### 🐛 Fixed

@@ -13,9 +13,9 @@ A native ntfy.sh client for the GNOME Desktop.
 
 </div>
 
-## 🎉 Version 0.7.2
+## 🎉 Version 0.8.0
 
-**Ntfyr 0.7.2** fixes Unified inbox sort direction, on top of 0.7.1's Markdown rendering, per-notification management, and richer filtering.
+**Ntfyr 0.8.0** adds ntfy access token authentication and moves to the GNOME 51 runtime, on top of 0.7.2's unified inbox sort fix and 0.7.1's Markdown rendering.
 
 ### ✨ Key Features
 
@@ -28,10 +28,15 @@ A native ntfy.sh client for the GNOME Desktop.
 - **🧩 Multiple Servers**: Group subscriptions by server for better organizational.
 - **🛡️ Privacy Focused**: Full support for self-hosted instances.
 
-### 🆕 What's New in 0.7.2
+### 🆕 What's New in 0.8.0
+
+- **Access token authentication**: Sign in to a server with an ntfy access token instead of a username and password.
+- **GNOME 51 runtime**: Flatpak builds now target the GNOME 51 platform.
+- **Dependency updates**: Updated Rust dependencies, including aes-gcm, rusqlite, sha2, and base64.
+
+### Also in 0.7.2
 
 - **Unified inbox sort fix**: Unified inbox now respects the Sort descending preference.
-- **Dependency updates**: Updated Rust dependencies to latest compatible versions.
 
 ### Also in 0.7.1
 

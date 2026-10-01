@@ -13,10 +13,11 @@ Ein nativer [ntfy.sh](https://ntfy.sh/)-Client für den GNOME-Desktop. Entwickel
 
 </div>
 
-## Aktuelles Release: 0.7.2
+## Aktuelles Release: 0.8.0
 
 Auszug der neuesten Änderungen (vollständige Historie in [CHANGELOG.md](CHANGELOG.md)):
 
+- **0.8.0 — Funktionsrelease** — Anmeldung an einem Server mit einem ntfy-Zugriffstoken statt Benutzername und Passwort; Flatpak-Builds nutzen nun die GNOME-51-Laufzeit.
 - **0.7.2 — Fehlerbehebung** — Unified Inbox beachtet nun die Sortierreihenfolge „Absteigend sortieren“.
 - **0.7.1 — Fehlerbehebung** — als Markdown gesendete Benachrichtigungen werden nun gerendert (erkannt über den Content-Type der Nachricht).
 - **0.7.0 — Funktionsrelease** — einzelne Benachrichtigungen löschen, nach Priorität und Tags filtern und ntfy-Benachrichtigungsaktualisierungen unterstützen (aktualisierte Meldungen ersetzen das Original und werden als „Bearbeitet“ markiert).
@@ -32,7 +33,7 @@ Installieren Sie die stabile Version über [Flathub](https://flathub.org/en/apps
 ## Funktionen
 
 ### Kern
-- **Native Desktop-Integration** — GTK4 + Libadwaita, GNOME Platform 50.
+- **Native Desktop-Integration** — GTK4 + Libadwaita, GNOME Platform 51.
 - **Push-Benachrichtigungen** — Topics auf `ntfy.sh` oder selbst gehosteten Servern abonnieren.
 - **Hintergrund-Daemon** — In-Process-Backend hält SSE-Verbindungen und liefert Desktop-Benachrichtigungen.
 - **Lokaler Verlauf** — Nachrichten in SQLite für Offline-Ansicht und Suche.

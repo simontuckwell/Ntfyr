@@ -14,9 +14,9 @@ tokio-util = { version = "0.7", features = ["compat", "io", "codec"] }
 clap = { version = "4.3.11", features = ["derive"] }
 anyhow = "1.0.71"
 tokio-stream = { version = "0.1.14", features = ["io-util", "time", "sync"] }
-rusqlite = "0.39"
+rusqlite = "0.40"
 rand = "0.10"
-reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls", "rustls-native-certs"]}
+reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls"]}
 url = { version = "2.4.0", features = ["serde"] }
 tracing = "0.1.37"
 thiserror = "2.0"
@@ -26,6 +26,6 @@ async-trait = "0.1.83"
 http = "1.1.0"
 async-channel = "2.3.1"
 chrono = "0.4.42"
-aes-gcm = "0.10.3"
-base64 = "0.22.1"
-sha2 = "0.10.9"
+aes-gcm = "0.11.1"
+base64 = "0.23.1"
+sha2 = "0.11.0"

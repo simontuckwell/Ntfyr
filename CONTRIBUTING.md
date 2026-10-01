@@ -40,7 +40,7 @@ This project follows the principles of respect, inclusivity, and professionalism
 
 ```bash
 # Install dependencies
-flatpak install org.gnome.Sdk//49 org.gnome.Platform//49 org.freedesktop.Sdk.Extension.rust-stable//24.08
+flatpak install org.gnome.Sdk//51 org.gnome.Platform//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
 
 # Build and run
 flatpak-builder --user --install --force-clean build packaging/io.github.tobagin.Ntfyr.Devel.yml

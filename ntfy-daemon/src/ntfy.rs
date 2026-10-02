@@ -1,21 +1,21 @@
 use crate::actor_utils::send_command;
 use anyhow::anyhow;
-use futures::future::join_all;
 use futures::StreamExt;
+use futures::future::join_all;
 use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::{
     select,
-    sync::{mpsc, oneshot, RwLock},
+    sync::{RwLock, mpsc, oneshot},
     task::LocalSet,
 };
 use tracing::{error, info};
 
 use crate::{
+    ListenerConfig, ListenerHandle, SharedEnv, SubscriptionHandle,
     credentials::Credential,
     http_client::HttpClient,
     message_repo::Db,
     models::{self, Account},
-    ListenerConfig, ListenerHandle, SharedEnv, SubscriptionHandle,
 };
 
 const CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);

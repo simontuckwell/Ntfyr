@@ -762,8 +762,7 @@ mod deep_link_tests {
         assert_eq!(link.topic, "mytopic");
         assert_eq!(link.display_name, None);
 
-        let link =
-            parse_ntfy_deep_link("ntfy://example.com/mytopic?display=My+Topic").unwrap();
+        let link = parse_ntfy_deep_link("ntfy://example.com/mytopic?display=My+Topic").unwrap();
         assert_eq!(link.server, "https://example.com");
         assert_eq!(link.topic, "mytopic");
         assert_eq!(link.display_name.as_deref(), Some("My Topic"));

@@ -1201,7 +1201,11 @@ impl NtfyrWindow {
                 servers.push(server.clone());
                 let _ = settings.set_strv(
                     "custom-servers",
-                    servers.iter().map(|s| s.as_str()).collect::<Vec<_>>().as_slice(),
+                    servers
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
                 );
             }
         }

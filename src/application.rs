@@ -294,11 +294,48 @@ mod imp {
                 // always present the window even when start-in-background is set.
                 app.ensure_window_present();
                 match parse_ntfy_deep_link(&uri) {
-                    Ok(link) => app.main_window().subscribe_from_deep_link(
-                        link.server,
-                        link.topic,
-                        link.display_name,
-                    ),
+                    Ok(link) => {
+                        let parent = app.main_window();
+                        let mut body = format!(
+                            "{} {}\n{} {}",
+                            gettext("Server:"),
+                            link.server,
+                            gettext("Topic:"),
+                            link.topic,
+                        );
+                        if link.server.starts_with("http://") {
+                            body.push_str(&format!(
+                                "\n\n{}",
+                                gettext(
+                                    "Warning: This subscription uses unencrypted HTTP. Credentials and notifications may be exposed in transit."
+                                )
+                            ));
+                        }
+
+                        let dialog = adw::AlertDialog::new(
+                            Some(&gettext("Subscribe to Topic?")),
+                            Some(&body),
+                        );
+                        dialog.add_response("cancel", &gettext("Cancel"));
+                        dialog.add_response("subscribe", &gettext("Subscribe"));
+                        dialog.set_response_appearance(
+                            "subscribe",
+                            adw::ResponseAppearance::Suggested,
+                        );
+                        dialog.set_default_response(Some("cancel"));
+                        dialog.set_close_response("cancel");
+
+                        glib::MainContext::default().spawn_local(async move {
+                            let response = dialog.choose_future(Some(&parent)).await;
+                            if response == "subscribe" {
+                                parent.subscribe_from_deep_link(
+                                    link.server,
+                                    link.topic,
+                                    link.display_name,
+                                );
+                            }
+                        });
+                    }
                     Err(e) => warn!(uri = %uri, error = %e, "ignoring invalid ntfy deep link"),
                 }
                 return glib::ExitCode::SUCCESS;

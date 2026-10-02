@@ -488,10 +488,11 @@ impl NtfyrWindow {
     fn has_subscription(&self, server: &str, topic: &str) -> bool {
         let model = &self.imp().subscription_list_model;
         for i in 0..model.n_items() {
-            if let Some(sub) = model.item(i).and_downcast::<Subscription>() {
-                if sub.server() == server && sub.topic() == topic {
-                    return true;
-                }
+            if let Some(sub) = model.item(i).and_downcast::<Subscription>()
+                && sub.server() == server
+                && sub.topic() == topic
+            {
+                return true;
             }
         }
         false

@@ -73,10 +73,8 @@ fn parse_ntfy_deep_link(value: &str) -> Result<NtfyDeepLink, String> {
             "secure" => {
                 secure = !(value.eq_ignore_ascii_case("false") || value == "0");
             }
-            "display" => {
-                if !value.is_empty() {
-                    display_name = Some(value.into_owned());
-                }
+            "display" if !value.is_empty() => {
+                display_name = Some(value.into_owned());
             }
             _ => {}
         }
